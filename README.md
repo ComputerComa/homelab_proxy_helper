@@ -1,4 +1,15 @@
-# Homelab Proxy Helper
+# Homelab- 🔧 **Nginx Proxy Manager Integration**: Create proxy host configurations automatically
+- 🔐 **SSL Certificate Management**: Automatically request Let's Encrypt certificates or use existing ones
+- 🎯 **Default SSL Certificate**: Set a default SSL certificate for streamlined proxy creation
+- 🌐 **Cloudflare Proxy Support**: CNAME records created with proxy enabled by default for better performance and security
+- 🎮 **Interactive Menu**: User-friendly menu system when no command is provided
+- 📦 **Standalone Executables**: Cross-platform binaries that don't require Node.js
+- 📋 **Interactive CLI**: User-friendly prompts for easy configuration
+- 🎯 **Bulk Operations**: List and manage multiple domains and proxy hosts
+- ⚡ **Fast Setup**: One command to create complete subdomain + proxy setup
+- 🧹 **Automated Cleanup**: Health monitoring and automatic removal of stale records
+- 🔄 **CNAME-Only**: Optimized for homelab setups with CNAME records pointing to apex domain
+- ✅ **A Record Validation**: Automatically validates that apex domain has proper A recorder
 
 A Node.js command-line tool to automate the creation of subdomains and Nginx Proxy Manager configurations for homelab projects. This tool integrates with Cloudflare's DNS API and Nginx Proxy Manager's API to streamline the process of setting up reverse proxies for your homelab services.
 
@@ -123,19 +134,23 @@ Create a new subdomain and proxy configuration.
 - `-d, --domain <domain>` - Domain name (uses default if not specified)
 - `--ssl` - Enable SSL certificate
 - `--force-ssl` - Force SSL redirect
-- `--record-type <type>` - DNS record type (CNAME or A, default: CNAME)
-- `--dns-target <target>` - DNS record target (for A records, specify IP; for CNAME, defaults to apex domain)
+- `--ssl-cert <id>` - Use existing SSL certificate by ID
+- `--no-proxy` - Disable Cloudflare proxy (DNS-only mode)
+- `--list-certs` - List available SSL certificates
 
 **Examples:**
 ```bash
 # Interactive mode
 homelab-proxy create
 
-# Create CNAME record (default)
+# Create CNAME record with proxy enabled (default)
 homelab-proxy create -s grafana -t 192.168.1.100:3000 --ssl
 
-# Create A record
-homelab-proxy create -s grafana -t 192.168.1.100:3000 --record-type A --dns-target 192.168.1.100 --ssl
+# Create CNAME record with proxy disabled (DNS-only)
+homelab-proxy create -s grafana -t 192.168.1.100:3000 --ssl --no-proxy
+
+# Use existing SSL certificate
+homelab-proxy create -s nextcloud -t 192.168.1.101:8080 --ssl-cert 123
 
 # Full specification with CNAME
 homelab-proxy create -s nextcloud -t 192.168.1.101:8080 -d example.com --ssl --force-ssl

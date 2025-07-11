@@ -109,11 +109,32 @@ homelab-proxy create -s grafana -t 192.168.1.100:3000 --ssl
 ```
 
 This will:
-1. Create a DNS CNAME record: `grafana.example.com` → `example.com` (apex domain)
+1. Create a DNS CNAME record: `grafana.example.com` → `example.com` (apex domain) with **Cloudflare proxy enabled**
 2. Create a proxy host in NPM: `grafana.example.com` → `192.168.1.100:3000`
 3. Request an SSL certificate (if `--ssl` flag is used)
 
-**Note**: By default, the tool creates CNAME records that point to your apex domain. This is ideal for homelab setups where you have one A record for your main domain and CNAME records for subdomains.
+**Note**: By default, the tool creates CNAME records that point to your apex domain with Cloudflare proxy enabled. This provides better performance, security, and DDoS protection. If you need DNS-only mode, use the `--no-proxy` flag.
+
+## DNS Proxy Options
+
+**Cloudflare Proxy Enabled (Default)**:
+- Better performance with Cloudflare CDN
+- DDoS protection and security features
+- SSL/TLS encryption at the edge
+- Hides your origin server IP
+
+**DNS-Only Mode**:
+- Direct DNS resolution without proxy
+- Use when you need direct access to your server
+- Required for some applications that don't work with proxies
+
+```bash
+# Create with proxy enabled (default)
+homelab-proxy create -s grafana -t 192.168.1.100:3000 --ssl
+
+# Create with DNS-only mode
+homelab-proxy create -s grafana -t 192.168.1.100:3000 --ssl --no-proxy
+```
 
 ## SSL Certificate Options
 

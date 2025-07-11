@@ -66,7 +66,7 @@ class CloudflareManager {
     }
   }
 
-  async createDnsRecord(subdomain, domain, recordType = 'CNAME', content = null) {
+  async createDnsRecord(subdomain, domain, recordType = 'CNAME', content = null, proxied = true) {
     try {
       // Validate that an A record exists for the apex domain
       await this.validateApexARecord(domain);
@@ -84,7 +84,7 @@ class CloudflareManager {
           name: recordName,
           content: recordContent,
           ttl: this.getTtlValue(this.config.ttl), // TTL of 1 means "auto" in Cloudflare API
-          proxied: false, // CNAME records cannot be proxied
+          proxied: proxied, // Enable proxy by default for CNAME records
         },
         {
           headers: this.headers,
@@ -93,7 +93,7 @@ class CloudflareManager {
 
       if (response.data.success) {
         this.logger.success(
-          `DNS record created: ${recordName} (${recordType}) -> ${recordContent}`
+          `DNS record created: ${recordName} (${recordType}) -> ${recordContent} ${proxied ? '(proxied)' : '(DNS-only)'}`
         );
         return response.data.result;
       } else {
@@ -109,8 +109,8 @@ class CloudflareManager {
     }
   }
 
-  async createCnameRecord(subdomain, domain, target = null) {
-    return await this.createDnsRecord(subdomain, domain, 'CNAME', target);
+  async createCnameRecord(subdomain, domain, target = null, proxied = true) {
+    return await this.createDnsRecord(subdomain, domain, 'CNAME', target, proxied);
   }
 
   async getDnsRecord(subdomain, domain) {

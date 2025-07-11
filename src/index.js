@@ -87,6 +87,7 @@ program
   .option('--force-ssl', 'Force SSL redirect')
   .option('--ssl-cert <id>', 'Use existing SSL certificate by ID')
   .option('--list-certs', 'List available SSL certificates')
+  .option('--no-proxy', 'Disable Cloudflare proxy (DNS-only mode)')
   .action(async options => {
     try {
       const configManager = new ConfigManager();
@@ -198,9 +199,21 @@ program
             default: true,
             when: options.forceSsl === undefined,
           },
+          {
+            type: 'confirm',
+            name: 'enableProxy',
+            message: 'Enable Cloudflare proxy for DNS record?',
+            default: true,
+            when: options.noProxy === undefined,
+          },
         ]);
 
         options = { ...options, ...answers };
+        
+        // Convert enableProxy to noProxy for consistency with CLI flag
+        if (options.enableProxy !== undefined) {
+          options.noProxy = !options.enableProxy;
+        }
       }
 
       // Handle default SSL certificate
@@ -214,9 +227,11 @@ program
       );
 
       // Create CNAME record (validates A record exists for apex domain)
-      await cloudflare.createCnameRecord(options.subdomain, options.domain || config.defaultDomain);
+      // By default, enable proxy unless --no-proxy is specified
+      const enableProxy = !options.noProxy;
+      await cloudflare.createCnameRecord(options.subdomain, options.domain || config.defaultDomain, null, enableProxy);
       logger.success(
-        `CNAME record created: ${options.subdomain}.${options.domain || config.defaultDomain} -> ${options.domain || config.defaultDomain}`
+        `CNAME record created: ${options.subdomain}.${options.domain || config.defaultDomain} -> ${options.domain || config.defaultDomain} ${enableProxy ? '(proxied)' : '(DNS-only)'}`
       );
 
       // Create proxy host
