@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  nginx-proxy-manager:
+    image: 'jc21/nginx-proxy-manager:latest'
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '81:81'
+    environment:
+      # Uncomment this if you want to change the location of
+      # the SQLite DB file within the container
+      DB_SQLITE_FILE: "/data/database.sqlite"
+      # Uncomment this if IPv6 is not enabled on your host
+      # DISABLE_IPV6: 'true'
+    volumes:
+      - ./data:/data
+      - ./letsencrypt:/etc/letsencrypt
+    networks:
+      - homelab-proxy
+
+  homelab-proxy-helper:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - nginx-proxy-manager
+    environment:
+      - NODE_ENV=development
+      - DEBUG=true
+    volumes:
+      - ./src:/app/src
+      - ~/.homelab-proxy:/root/.homelab-proxy
+    networks:
+      - homelab-proxy
+    # Override the default command for development
+    command: sh -c "npm install && npm run dev"
+
+networks:
+  homelab-proxy:
+    driver: bridge
+
+volumes:
+  data:
+  letsencrypt:

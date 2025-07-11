@@ -128,3 +128,14 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Project-specific files
+config.json
+.env
+
+# Test coverage
+coverage/
+
+# IDE files
+.vscode/
+.idea/
