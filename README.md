@@ -1,4 +1,16 @@
-# Homelab- 🔧 **Nginx Proxy Manager Integration**: Create proxy host configurations automatically
+# Homelab- 🔧 **Ngi- 🌐 **Cloudflare Integration**: Automatically create CNAME DNS records for your subdomains
+- 🔧 **Nginx Proxy Manager Integration**: Create proxy host configurations automatically
+- 🔐 **SSL Certificate Management**: Automatically request Let's Encrypt certificates or use existing ones
+- 🎯 **Default SSL Certificate**: Set a default SSL certificate for streamlined proxy creation
+- 🌐 **Cloudflare Proxy Support**: CNAME records created with proxy enabled by default for better performance and security
+- 🔌 **WebSocket Support**: Enable WebSocket support for modern web applications (enabled by default)
+- 🎮 **Interactive Menu**: User-friendly menu system when no command is provided
+- 📦 **Standalone Executables**: Cross-platform binaries that don't require Node.js
+- 📋 **Interactive CLI**: User-friendly prompts for easy configuration
+- 🎯 **Bulk Operations**: List and manage multiple domains and proxy hosts
+- ⚡ **Fast Setup**: One command to create complete subdomain + proxy setup
+- 🧹 **Automated Cleanup**: Health monitoring and automatic removal of stale records
+- 🔄 **CNAME-Only**: Optimized for homelab setups with CNAME records pointing to apex domainnager Integration**: Create proxy host configurations automatically
 - 🔐 **SSL Certificate Management**: Automatically request Let's Encrypt certificates or use existing ones
 - 🎯 **Default SSL Certificate**: Set a default SSL certificate for streamlined proxy creation
 - 🌐 **Cloudflare Proxy Support**: CNAME records created with proxy enabled by default for better performance and security
@@ -124,6 +136,7 @@ Initialize the tool configuration. This command will prompt you for:
 - Nginx Proxy Manager URL and credentials
 - Primary domain name
 - SSL configuration preferences
+- WebSocket support default setting
 
 ### `homelab-proxy create [options]`
 Create a new subdomain and proxy configuration.
@@ -136,6 +149,7 @@ Create a new subdomain and proxy configuration.
 - `--force-ssl` - Force SSL redirect
 - `--ssl-cert <id>` - Use existing SSL certificate by ID
 - `--no-proxy` - Disable Cloudflare proxy (DNS-only mode)
+- `--no-websockets` - Disable WebSocket support
 - `--list-certs` - List available SSL certificates
 
 **Examples:**
@@ -149,6 +163,9 @@ homelab-proxy create -s grafana -t 192.168.1.100:3000 --ssl
 # Create CNAME record with proxy disabled (DNS-only)
 homelab-proxy create -s grafana -t 192.168.1.100:3000 --ssl --no-proxy
 
+# Disable WebSocket support
+homelab-proxy create -s api -t 192.168.1.100:8080 --ssl --no-websockets
+
 # Use existing SSL certificate
 homelab-proxy create -s nextcloud -t 192.168.1.101:8080 --ssl-cert 123
 
@@ -158,6 +175,10 @@ homelab-proxy create -s nextcloud -t 192.168.1.101:8080 -d example.com --ssl --f
 
 ### `homelab-proxy list`
 List all managed DNS records and proxy hosts in a formatted table.
+
+**Shows:**
+- **DNS Records**: Name, Type, Content, TTL, Proxied status
+- **Proxy Hosts**: ID, Domain, Forward To, SSL status, WebSocket status, Enabled status
 
 **Options:**
 - `-j, --json` - Output in JSON format instead of table format

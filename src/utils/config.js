@@ -83,6 +83,12 @@ class ConfigManager {
         message: 'Enter your Let\'s Encrypt email (optional):',
         default: answers => answers.nginxProxyManagerEmail,
       },
+      {
+        type: 'confirm',
+        name: 'defaultWebsockets',
+        message: 'Enable WebSocket support by default for new proxy hosts?',
+        default: true,
+      },
     ]);
 
     const config = {
@@ -98,6 +104,7 @@ class ConfigManager {
         email: answers.nginxProxyManagerEmail,
         password: answers.nginxProxyManagerPassword,
         letsencryptEmail: answers.letsencryptEmail,
+        defaultWebsockets: answers.defaultWebsockets,
       },
       createdAt: new Date().toISOString(),
     };

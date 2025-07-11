@@ -70,6 +70,11 @@ program
         console.log(chalk.yellow('  Default SSL Certificate:'), 'Not set');
       }
 
+      console.log(
+        chalk.yellow('  Default WebSocket Support:'),
+        config.nginxProxyManager.defaultWebsockets !== false ? 'Enabled' : 'Disabled'
+      );
+
       console.log(chalk.green('Created:'), new Date(config.createdAt).toLocaleString());
     } catch (error) {
       logger.error('Failed to load configuration:', error.message);
@@ -88,6 +93,7 @@ program
   .option('--ssl-cert <id>', 'Use existing SSL certificate by ID')
   .option('--list-certs', 'List available SSL certificates')
   .option('--no-proxy', 'Disable Cloudflare proxy (DNS-only mode)')
+  .option('--no-websockets', 'Disable WebSocket support')
   .action(async options => {
     try {
       const configManager = new ConfigManager();
@@ -206,6 +212,13 @@ program
             default: true,
             when: options.noProxy === undefined,
           },
+          {
+            type: 'confirm',
+            name: 'enableWebsockets',
+            message: 'Enable WebSocket support?',
+            default: config.nginxProxyManager.defaultWebsockets !== false, // Use config default or true
+            when: options.noWebsockets === undefined,
+          },
         ]);
 
         options = { ...options, ...answers };
@@ -213,6 +226,11 @@ program
         // Convert enableProxy to noProxy for consistency with CLI flag
         if (options.enableProxy !== undefined) {
           options.noProxy = !options.enableProxy;
+        }
+        
+        // Convert enableWebsockets to noWebsockets for consistency with CLI flag
+        if (options.enableWebsockets !== undefined) {
+          options.noWebsockets = !options.enableWebsockets;
         }
       }
 
@@ -242,6 +260,7 @@ program
         ssl: options.ssl || options.sslCert,
         forceSsl: options.forceSsl,
         sslCertId: options.sslCert,
+        websockets: !options.noWebsockets, // Enable WebSockets unless --no-websockets is specified
       };
 
       await npm.createProxyHost(proxyHostOptions);
@@ -339,6 +358,7 @@ program
               chalk.bold('Domain'),
               chalk.bold('Forward To'),
               chalk.bold('SSL'),
+              chalk.bold('WebSockets'),
               chalk.bold('Status'),
             ],
           ];
@@ -351,9 +371,17 @@ program
             const forwardPort = host.forward_port || '';
             const forwardTo = forwardPort ? `${forwardHost}:${forwardPort}` : forwardHost;
             const sslStatus = host.certificate_id ? chalk.green('Enabled') : chalk.red('Disabled');
+            const websocketStatus = host.websockets_enabled ? chalk.green('Enabled') : chalk.red('Disabled');
             const status = host.enabled ? chalk.green('Enabled') : chalk.red('Disabled');
 
-            proxyTableData.push([host.id || 'N/A', domainNames, forwardTo, sslStatus, status]);
+            proxyTableData.push([
+              host.id || 'N/A',
+              domainNames,
+              forwardTo,
+              sslStatus,
+              websocketStatus,
+              status,
+            ]);
           });
 
           console.log(

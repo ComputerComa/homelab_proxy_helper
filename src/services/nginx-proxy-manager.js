@@ -49,6 +49,7 @@ class NginxProxyManager {
         ssl_forced: options.forceSsl || false,
         caching_enabled: false,
         block_exploits: true,
+        websockets_enabled: options.websockets !== false, // Default to true unless explicitly disabled
         advanced_config: '',
         locations: [],
         meta: {},
@@ -62,8 +63,9 @@ class NginxProxyManager {
       });
 
       if (response.data) {
+        const websocketStatus = options.websockets !== false ? 'WebSockets enabled' : 'WebSockets disabled';
         this.logger.success(
-          `Proxy host created: ${options.subdomain}.${options.domain} -> ${options.target}`
+          `Proxy host created: ${options.subdomain}.${options.domain} -> ${options.target} (${websocketStatus})`
         );
 
         // If SSL is enabled and no existing certificate ID was provided, try to get a new certificate
@@ -186,14 +188,26 @@ class NginxProxyManager {
         },
       });
 
-      return response.data.map(host => ({
+      // Handle different response structures
+      const hosts = response.data.data || response.data || [];
+      
+      if (hosts.length === 0) {
+        this.logger.info('No proxy hosts found in NPM');
+      } else {
+        this.logger.info(`Found ${hosts.length} proxy host(s)`);
+      }
+      
+      return hosts.map(host => ({
         id: host.id,
-        domains: host.domain_names,
-        target: `${host.forward_host}:${host.forward_port}`,
-        ssl: host.certificate_id > 0,
+        domain_names: host.domain_names,
+        forward_host: host.forward_host,
+        forward_port: host.forward_port,
+        certificate_id: host.certificate_id,
         enabled: host.enabled,
-        created: host.created_on,
-        modified: host.modified_on,
+        ssl_forced: host.ssl_forced,
+        websockets_enabled: host.websockets_enabled,
+        created_on: host.created_on,
+        modified_on: host.modified_on,
       }));
     } catch (error) {
       this.logger.error('Failed to list proxy hosts:', error.message);

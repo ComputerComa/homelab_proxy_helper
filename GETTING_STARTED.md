@@ -73,6 +73,7 @@ You'll be prompted to enter:
 - **NPM Email**: Your Nginx Proxy Manager email
 - **NPM Password**: Your Nginx Proxy Manager password
 - **Let's Encrypt Email**: Email for SSL certificates (optional)
+- **WebSocket Support**: Whether to enable WebSocket support by default (recommended: Yes)
 
 **Important**: This tool creates CNAME records that point to your apex domain. You must have an A record for your apex domain (e.g., `example.com`) pointing to your server's IP address. The tool will validate this A record exists before creating CNAME records.
 
@@ -134,6 +135,25 @@ homelab-proxy create -s grafana -t 192.168.1.100:3000 --ssl
 
 # Create with DNS-only mode
 homelab-proxy create -s grafana -t 192.168.1.100:3000 --ssl --no-proxy
+```
+
+## WebSocket Support
+
+**WebSocket Enabled (Default)**:
+- Supports modern web applications that use WebSockets
+- Required for real-time features like live chat, notifications, etc.
+- Works with applications like Home Assistant, Grafana, etc.
+
+**WebSocket Disabled**:
+- Use for traditional web applications that don't need WebSocket support
+- Slightly reduces overhead for simple static websites
+
+```bash
+# Create with WebSocket support enabled (default)
+homelab-proxy create -s grafana -t 192.168.1.100:3000 --ssl
+
+# Create with WebSocket support disabled
+homelab-proxy create -s static-site -t 192.168.1.100:8080 --ssl --no-websockets
 ```
 
 ## SSL Certificate Options
