@@ -18,9 +18,6 @@ function validateConfig(config) {
     if (!config.cloudflare.apiToken) {
       errors.push('Cloudflare API token is missing');
     }
-    if (!config.cloudflare.defaultIp) {
-      errors.push('Cloudflare default IP is missing');
-    }
     if (!config.cloudflare.domains || config.cloudflare.domains.length === 0) {
       errors.push('Cloudflare domains are missing');
     }

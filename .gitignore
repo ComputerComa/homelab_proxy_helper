@@ -136,6 +136,12 @@ config.json
 # Test coverage
 coverage/
 
+# Build outputs
+dist/
+build/
+*.exe
+homelab-proxy-*
+
 # IDE files
 .vscode/
 .idea/

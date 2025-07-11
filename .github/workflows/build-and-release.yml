@@ -1,0 +1,240 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'package.json'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'package.json'
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version-changed: ${{ steps.version-check.outputs.version-changed }}
+      new-version: ${{ steps.version-check.outputs.new-version }}
+      is-major-version: ${{ steps.version-check.outputs.is-major-version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check version change
+        id: version-check
+        run: |
+          # Get current version from package.json
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "new-version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          
+          # Get previous version from the last commit
+          if git show HEAD~1:package.json > /dev/null 2>&1; then
+            OLD_VERSION=$(git show HEAD~1:package.json | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8')).version")
+            echo "Previous version: $OLD_VERSION"
+            echo "Current version: $NEW_VERSION"
+            
+            if [ "$OLD_VERSION" != "$NEW_VERSION" ]; then
+              echo "version-changed=true" >> $GITHUB_OUTPUT
+              
+              # Check if it's a major version change (x.0.0)
+              if [[ "$NEW_VERSION" =~ ^[0-9]+\.0\.0$ ]]; then
+                echo "is-major-version=true" >> $GITHUB_OUTPUT
+                echo "Major version change detected: $NEW_VERSION"
+              else
+                echo "is-major-version=false" >> $GITHUB_OUTPUT
+                echo "Minor/patch version change detected: $NEW_VERSION"
+              fi
+            else
+              echo "version-changed=false" >> $GITHUB_OUTPUT
+              echo "is-major-version=false" >> $GITHUB_OUTPUT
+              echo "No version change detected"
+            fi
+          else
+            echo "version-changed=true" >> $GITHUB_OUTPUT
+            echo "is-major-version=false" >> $GITHUB_OUTPUT
+            echo "Initial version: $NEW_VERSION"
+          fi
+
+  test:
+    runs-on: ubuntu-latest
+    needs: check-version
+    if: needs.check-version.outputs.version-changed == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Run linting
+        run: npm run lint --if-present
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [check-version, test]
+    if: needs.check-version.outputs.version-changed == 'true'
+    strategy:
+      matrix:
+        target: [win, linux, macos]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build executable for ${{ matrix.target }}
+        run: npm run build:${{ matrix.target }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: homelab-proxy-${{ matrix.target }}
+          path: |
+            dist/homelab-proxy-win.exe
+            dist/homelab-proxy-linux
+            dist/homelab-proxy-macos
+          retention-days: 30
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [check-version, test, build]
+    if: needs.check-version.outputs.version-changed == 'true' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -name "homelab-proxy-win.exe" -exec cp {} release-assets/ \;
+          find artifacts -name "homelab-proxy-linux" -exec cp {} release-assets/ \;
+          find artifacts -name "homelab-proxy-macos" -exec cp {} release-assets/ \;
+          ls -la release-assets/
+
+      - name: Generate release notes
+        id: release-notes
+        run: |
+          VERSION="${{ needs.check-version.outputs.new-version }}"
+          echo "Generating release notes for version $VERSION"
+          
+          # Create release notes
+          cat > release-notes.md << EOF
+          # Homelab Proxy Helper v$VERSION
+          
+          ## 🚀 What's New
+          
+          This release includes the latest features and improvements to the Homelab Proxy Helper CLI tool.
+          
+          ## 📦 Installation Options
+          
+          ### Option 1: Standalone Executables (Recommended)
+          Download the appropriate executable for your platform:
+          - **Windows**: \`homelab-proxy-win.exe\`
+          - **Linux**: \`homelab-proxy-linux\`
+          - **macOS**: \`homelab-proxy-macos\`
+          
+          No Node.js installation required!
+          
+          ### Option 2: npm Installation
+          \`\`\`bash
+          npm install -g homelab-proxy-helper@$VERSION
+          \`\`\`
+          
+          ## 🎯 Key Features
+          
+          - 🌐 **Cloudflare Integration**: Automatically create CNAME DNS records
+          - 🔧 **Nginx Proxy Manager Integration**: Create proxy host configurations
+          - 🔐 **SSL Certificate Management**: Request Let's Encrypt certificates or use existing ones
+          - 🎮 **Interactive Menu**: User-friendly interface when no command is provided
+          - 📦 **Cross-Platform**: Standalone executables for Windows, Linux, and macOS
+          - 🧹 **Automated Cleanup**: Health monitoring and removal of stale records
+          - ✅ **A Record Validation**: Ensures proper DNS setup
+          
+          ## 📋 Usage
+          
+          ### Interactive Mode
+          \`\`\`bash
+          # Run without arguments to access the interactive menu
+          ./homelab-proxy-[platform]
+          \`\`\`
+          
+          ### Command Line Mode
+          \`\`\`bash
+          # Initialize configuration
+          ./homelab-proxy-[platform] init
+          
+          # Create a new subdomain and proxy
+          ./homelab-proxy-[platform] create -s grafana -t 192.168.1.100:3000 --ssl
+          
+          # List all domains and proxies
+          ./homelab-proxy-[platform] list
+          
+          # Cleanup stale records
+          ./homelab-proxy-[platform] cleanup
+          \`\`\`
+          
+          ## 🔧 Requirements
+          
+          - Cloudflare account with API access
+          - Nginx Proxy Manager instance
+          - Domain managed by Cloudflare
+          
+          ## 📚 Documentation
+          
+          - [Getting Started Guide](https://github.com/ComputerComa/homelab_proxy_helper/blob/main/GETTING_STARTED.md)
+          - [Build Instructions](https://github.com/ComputerComa/homelab_proxy_helper/blob/main/BUILD.md)
+          - [Full Documentation](https://github.com/ComputerComa/homelab_proxy_helper/blob/main/README.md)
+          
+          ---
+          
+          **Full Changelog**: https://github.com/ComputerComa/homelab_proxy_helper/compare/v${{ github.event.before }}...v$VERSION
+          EOF
+          
+          echo "Release notes generated"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.check-version.outputs.new-version }}
+          name: Homelab Proxy Helper v${{ needs.check-version.outputs.new-version }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: ${{ needs.check-version.outputs.is-major-version == 'false' }}
+          files: |
+            release-assets/homelab-proxy-win.exe
+            release-assets/homelab-proxy-linux
+            release-assets/homelab-proxy-macos
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update npm package (if major version)
+        if: needs.check-version.outputs.is-major-version == 'true'
+        run: |
+          echo "Major version release detected. Consider updating npm package."
+          echo "Run 'npm publish' manually if you want to publish to npm registry."

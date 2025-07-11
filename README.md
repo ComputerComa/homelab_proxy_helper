@@ -9,7 +9,10 @@ The tool creates CNAME records that point to your apex domain, which is ideal fo
 - 🌐 **Cloudflare Integration**: Automatically create CNAME DNS records for your subdomains
 - 🔧 **Nginx Proxy Manager Integration**: Create proxy host configurations automatically
 - 🔐 **SSL Certificate Management**: Automatically request Let's Encrypt certificates or use existing ones
-- 📋 **Interactive CLI**: User-friendly prompts for easy configuration
+- 🎯 **Default SSL Certificate**: Set a default SSL certificate for streamlined proxy creation
+- 🎮 **Interactive Menu**: User-friendly menu system when no command is provided
+- � **Standalone Executables**: Cross-platform binaries that don't require Node.js
+- �📋 **Interactive CLI**: User-friendly prompts for easy configuration
 - 🎯 **Bulk Operations**: List and manage multiple domains and proxy hosts
 - ⚡ **Fast Setup**: One command to create complete subdomain + proxy setup
 - 🧹 **Automated Cleanup**: Health monitoring and automatic removal of stale records
@@ -25,12 +28,21 @@ The tool creates CNAME records that point to your apex domain, which is ideal fo
 
 ## Installation
 
-### Global Installation
+### Option 1: Standalone Executable (Recommended)
+Download the appropriate executable for your platform from the [releases page](https://github.com/ComputerComa/homelab_proxy_helper/releases):
+
+- **Windows**: `homelab-proxy-win.exe`
+- **Linux**: `homelab-proxy-linux`
+- **macOS**: `homelab-proxy-macos`
+
+No Node.js installation required! The executables are self-contained.
+
+### Option 2: Global Installation
 ```bash
 npm install -g homelab-proxy-helper
 ```
 
-### Local Development
+### Option 3: Local Development
 ```bash
 git clone https://github.com/yourusername/homelab-proxy-helper.git
 cd homelab-proxy-helper
@@ -38,8 +50,45 @@ npm install
 npm link
 ```
 
+### Option 4: Build Your Own Executables
+```bash
+# Clone the repository
+git clone https://github.com/ComputerComa/homelab_proxy_helper.git
+cd homelab-proxy-helper
+npm install
+
+# Build for all platforms
+npm run build
+
+# Or build for specific platform
+npm run build:win    # Windows
+npm run build:linux  # Linux
+npm run build:macos  # macOS
+```
+
+See [BUILD.md](BUILD.md) for detailed build instructions.
+
 ## Quick Start
 
+### Interactive Mode
+Simply run the command without any arguments to access the interactive menu:
+
+```bash
+homelab-proxy
+```
+
+This will show a user-friendly menu with all available options:
+- 🚀 Create new subdomain and proxy
+- 📋 List all domains and proxies
+- 🗑️ Delete subdomain and proxy
+- 🧹 Cleanup stale records
+- 🔒 List SSL certificates
+- ⚙️ Set default SSL certificate
+- 🔧 Show/Edit configuration
+- 🔄 Initialize/Reconfigure
+- ❌ Exit
+
+### Command Line Mode
 1. **Initialize configuration**:
    ```bash
    homelab-proxy init
@@ -93,7 +142,19 @@ homelab-proxy create -s nextcloud -t 192.168.1.101:8080 -d example.com --ssl --f
 ```
 
 ### `homelab-proxy list`
-List all managed DNS records and proxy hosts.
+List all managed DNS records and proxy hosts in a formatted table.
+
+**Options:**
+- `-j, --json` - Output in JSON format instead of table format
+
+**Examples:**
+```bash
+# List in table format (default)
+homelab-proxy list
+
+# List in JSON format
+homelab-proxy list --json
+```
 
 ### `homelab-proxy delete [options]`
 Delete a subdomain and its proxy configuration.
@@ -115,7 +176,7 @@ homelab-proxy delete -s grafana -d example.com
 Show current configuration.
 
 ### `homelab-proxy cleanup [options]`
-Check all CNAME records for availability and remove stale entries.
+Check all CNAME records for availability and remove stale entries. Automatically excludes DKIM records (domains containing "_domainkey").
 
 **Options:**
 - `--dry-run` - Show what would be cleaned up without making changes
@@ -139,7 +200,43 @@ The cleanup command tests each CNAME record by making HTTP/HTTPS requests. Recor
 - Return 5xx server errors
 - Fail DNS resolution
 
-Records returning 4xx errors (like 404) are considered healthy since the service is responding.
+Records returning 4xx errors (like 404) are considered healthy since the service is responding. DKIM records (containing "_domainkey") are automatically excluded from cleanup.
+
+### `homelab-proxy list-certs`
+List all SSL certificates in Nginx Proxy Manager in a formatted table.
+
+**Options:**
+- `-j, --json` - Output in JSON format instead of table format
+
+**Examples:**
+```bash
+# List SSL certificates in table format (default)
+homelab-proxy list-certs
+
+# List SSL certificates in JSON format
+homelab-proxy list-certs --json
+```
+
+### `homelab-proxy set-default-ssl [options]`
+Set a default SSL certificate to use for new proxy hosts.
+
+**Options:**
+- `-i, --id <id>` - SSL certificate ID to set as default
+- `--clear` - Clear the default SSL certificate
+
+**Examples:**
+```bash
+# Set default SSL certificate by ID
+homelab-proxy set-default-ssl --id 5
+
+# Interactive mode to select from available certificates
+homelab-proxy set-default-ssl
+
+# Clear the default SSL certificate
+homelab-proxy set-default-ssl --clear
+```
+
+When a default SSL certificate is set, it will be automatically suggested when creating new proxy hosts. This is especially useful for wildcard certificates that can be used across multiple subdomains.
 
 ## Configuration
 

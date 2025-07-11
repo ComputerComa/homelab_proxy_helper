@@ -26,6 +26,36 @@ npm install
 npm link
 ```
 
+## Using the Tool
+
+### Interactive Menu (Recommended for Beginners)
+The easiest way to use the tool is through the interactive menu. Simply run:
+
+```bash
+homelab-proxy
+```
+
+This will display a user-friendly menu with all available options:
+- 🚀 Create new subdomain and proxy
+- 📋 List all domains and proxies
+- 🗑️ Delete subdomain and proxy
+- 🧹 Cleanup stale records
+- 🔒 List SSL certificates
+- ⚙️ Set default SSL certificate
+- 🔧 Show/Edit configuration
+- 🔄 Initialize/Reconfigure
+
+### Command Line Interface
+For advanced users or automation, you can use specific commands directly:
+
+```bash
+# Initialize configuration
+homelab-proxy init
+
+# Create a new subdomain
+homelab-proxy create -s grafana -t 192.168.1.100:3000 --ssl
+```
+
 ## Step 2: Initial Configuration
 
 Run the initialization command to set up your configuration:
@@ -109,8 +139,23 @@ homelab-proxy list-certs
 
 This will show you all available SSL certificates with their IDs, domains, and expiration dates.
 
+### Set Default SSL Certificate
+```bash
+# Set a default SSL certificate to use for new proxy hosts
+homelab-proxy set-default-ssl --id 5
+
+# Or use interactive mode to select from available certificates
+homelab-proxy set-default-ssl
+
+# Clear the default SSL certificate
+homelab-proxy set-default-ssl --clear
+```
+
+When you set a default SSL certificate, it will be automatically suggested when creating new proxy hosts. This is especially useful for wildcard certificates that can be used across multiple subdomains.
+
 ### Interactive SSL Selection
 When using the interactive mode, you'll be prompted to choose between:
+- Using the default SSL certificate (if one is configured)
 - Creating a new SSL certificate
 - Using an existing SSL certificate (with a list of available certificates)
 
@@ -119,6 +164,12 @@ When using the interactive mode, you'll be prompted to choose between:
 - Useful for wildcard certificates that cover multiple subdomains
 - Avoids Let's Encrypt rate limits
 - Consistent SSL configuration across multiple services
+
+**Benefits of setting a default SSL certificate:**
+- Streamlined workflow for users with wildcard certificates
+- Consistent SSL configuration across all services
+- One-click SSL setup for new proxy hosts
+- Reduces the need to remember certificate IDs
 
 ## DNS Record Management
 
@@ -164,10 +215,12 @@ homelab-proxy cleanup
 ```
 
 This command will:
-1. Check all CNAME records for availability
+1. Check all CNAME records for availability (excluding DKIM records)
 2. Test each domain with HTTP/HTTPS requests
 3. Mark records as STALE if they timeout or return 5xx errors
 4. Give you the option to remove stale records from both Cloudflare and NPM
+
+**Note**: The cleanup command automatically excludes DKIM records (domains containing "_domainkey") from health checks, as these are essential for email authentication and should not be removed.
 
 ### Cleanup Options
 

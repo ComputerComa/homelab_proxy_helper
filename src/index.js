@@ -2,6 +2,7 @@
 
 const { Command } = require('commander');
 const chalk = require('chalk');
+const { table } = require('table');
 const packageInfo = require('../package.json');
 const { CloudflareManager } = require('./services/cloudflare');
 const { NginxProxyManager } = require('./services/nginx-proxy-manager');
@@ -38,8 +39,25 @@ program
     try {
       const configManager = new ConfigManager();
       const config = await configManager.getConfig();
+      
       console.log(chalk.cyan('Current Configuration:'));
-      console.log(JSON.stringify(config, null, 2));
+      console.log(chalk.green('Domain:'), config.defaultDomain);
+      console.log(chalk.green('Cloudflare:'));
+      console.log(chalk.yellow('  API Token:'), config.cloudflare.apiToken ? '***' + config.cloudflare.apiToken.slice(-4) : 'Not set');
+      console.log(chalk.yellow('  TTL:'), config.cloudflare.ttl === 1 ? 'auto' : config.cloudflare.ttl);
+      console.log(chalk.green('Nginx Proxy Manager:'));
+      console.log(chalk.yellow('  URL:'), config.nginxProxyManager.url);
+      console.log(chalk.yellow('  Email:'), config.nginxProxyManager.email);
+      console.log(chalk.yellow('  Let\'s Encrypt Email:'), config.nginxProxyManager.letsencryptEmail || 'Not set');
+      
+      if (config.nginxProxyManager.defaultSslCertId) {
+        console.log(chalk.yellow('  Default SSL Certificate ID:'), config.nginxProxyManager.defaultSslCertId);
+      } else {
+        console.log(chalk.yellow('  Default SSL Certificate:'), 'Not set');
+      }
+      
+      console.log(chalk.green('Created:'), new Date(config.createdAt).toLocaleString());
+      
     } catch (error) {
       logger.error('Failed to load configuration:', error.message);
       process.exit(1);
@@ -80,7 +98,6 @@ program
         }
 
         logger.header('Available SSL Certificates');
-        const { table } = require('table');
         const tableData = [
           ['ID', 'Name', 'Domain Names', 'Status', 'Expires']
         ];
@@ -126,24 +143,6 @@ program
             when: !options.domain
           },
           {
-            type: 'list',
-            name: 'recordType',
-            message: 'Select DNS record type:',
-            choices: [
-              { name: 'CNAME (points to apex domain)', value: 'CNAME' },
-              { name: 'A (points to IP address)', value: 'A' }
-            ],
-            default: 'CNAME',
-            when: !options.recordType
-          },
-          {
-            type: 'input',
-            name: 'dnsTarget',
-            message: 'Enter DNS target (IP address):',
-            default: config.cloudflare.defaultIp,
-            when: (answers) => (answers.recordType === 'A' || options.recordType === 'A') && !options.dnsTarget
-          },
-          {
             type: 'confirm',
             name: 'ssl',
             message: 'Enable SSL certificate?',
@@ -154,11 +153,20 @@ program
             type: 'list',
             name: 'sslType',
             message: 'SSL certificate type:',
-            choices: [
-              { name: 'Request new Let\'s Encrypt certificate', value: 'new' },
-              { name: 'Use existing certificate', value: 'existing' }
-            ],
-            default: 'new',
+            choices: () => {
+              const choices = [
+                { name: 'Request new Let\'s Encrypt certificate', value: 'new' }
+              ];
+              
+              // Add default SSL certificate option if configured
+              if (config.nginxProxyManager.defaultSslCertId) {
+                choices.unshift({ name: 'Use default SSL certificate', value: 'default' });
+              }
+              
+              choices.push({ name: 'Use existing certificate', value: 'existing' });
+              return choices;
+            },
+            default: config.nginxProxyManager.defaultSslCertId ? 'default' : 'new',
             when: (answers) => (answers.ssl || options.ssl) && !options.sslCert
           },
           {
@@ -184,6 +192,12 @@ program
         ]);
         
         options = { ...options, ...answers };
+      }
+
+      // Handle default SSL certificate
+      if (options.sslType === 'default' && config.nginxProxyManager.defaultSslCertId) {
+        options.sslCert = config.nginxProxyManager.defaultSslCertId;
+        logger.info(`Using default SSL certificate (ID: ${options.sslCert})`);
       }
 
       logger.info(`Creating subdomain: ${options.subdomain}.${options.domain || config.defaultDomain}`);
@@ -213,8 +227,9 @@ program
 
 program
   .command('list')
-  .description('List all managed domains and proxy hosts')
-  .action(async () => {
+  .description('List all managed domains and proxy hosts in table format')
+  .option('-j, --json', 'Output in JSON format')
+  .action(async (options) => {
     try {
       const configManager = new ConfigManager();
       const config = await configManager.getConfig();
@@ -228,11 +243,99 @@ program
       logger.info('Fetching proxy hosts...');
       const proxyHosts = await npm.listProxyHosts();
 
-      console.log(chalk.cyan('\n=== DNS Records ==='));
-      console.log(dnsRecords);
+      if (options.json) {
+        // Output in JSON format
+        console.log(JSON.stringify({
+          dns_records: dnsRecords,
+          proxy_hosts: proxyHosts
+        }, null, 2));
+      } else {
+        // Output in human-readable table format
+        console.log(chalk.cyan('\n=== DNS Records ==='));
+        if (dnsRecords && dnsRecords.length > 0) {
+          const dnsTableData = [
+            [chalk.bold('Name'), chalk.bold('Type'), chalk.bold('Content'), chalk.bold('TTL'), chalk.bold('Proxied')]
+          ];
+          
+          dnsRecords.forEach(record => {
+            dnsTableData.push([
+              record.name || 'N/A',
+              record.type || 'N/A',
+              record.content || 'N/A',
+              record.ttl === 1 ? 'auto' : (record.ttl || 'N/A'),
+              record.proxied ? chalk.green('Yes') : chalk.red('No')
+            ]);
+          });
+          
+          console.log(table(dnsTableData, {
+            border: {
+              topBody: `─`,
+              topJoin: `┬`,
+              topLeft: `┌`,
+              topRight: `┐`,
+              bottomBody: `─`,
+              bottomJoin: `┴`,
+              bottomLeft: `└`,
+              bottomRight: `┘`,
+              bodyLeft: `│`,
+              bodyRight: `│`,
+              bodyJoin: `│`,
+              joinBody: `─`,
+              joinLeft: `├`,
+              joinRight: `┤`,
+              joinJoin: `┼`
+            }
+          }));
+        } else {
+          console.log(chalk.gray('No DNS records found.'));
+        }
 
-      console.log(chalk.cyan('\n=== Proxy Hosts ==='));
-      console.log(proxyHosts);
+        console.log(chalk.cyan('\n=== Proxy Hosts ==='));
+        if (proxyHosts && proxyHosts.length > 0) {
+          const proxyTableData = [
+            [chalk.bold('ID'), chalk.bold('Domain'), chalk.bold('Forward To'), chalk.bold('SSL'), chalk.bold('Status')]
+          ];
+          
+          proxyHosts.forEach(host => {
+          const domainNames = Array.isArray(host.domain_names) ? host.domain_names.join(', ') : (host.domain_names || 'N/A');
+          const forwardHost = host.forward_host || 'N/A';
+          const forwardPort = host.forward_port || '';
+          const forwardTo = forwardPort ? `${forwardHost}:${forwardPort}` : forwardHost;
+          const sslStatus = host.certificate_id ? chalk.green('Enabled') : chalk.red('Disabled');
+          const status = host.enabled ? chalk.green('Enabled') : chalk.red('Disabled');
+          
+          proxyTableData.push([
+            host.id || 'N/A',
+            domainNames,
+            forwardTo,
+            sslStatus,
+            status
+          ]);
+        });
+          
+          console.log(table(proxyTableData, {
+            border: {
+              topBody: `─`,
+              topJoin: `┬`,
+              topLeft: `┌`,
+              topRight: `┐`,
+              bottomBody: `─`,
+              bottomJoin: `┴`,
+              bottomLeft: `└`,
+              bottomRight: `┘`,
+              bodyLeft: `│`,
+              bodyRight: `│`,
+              bodyJoin: `│`,
+              joinBody: `─`,
+              joinLeft: `├`,
+              joinRight: `┤`,
+              joinJoin: `┼`
+            }
+          }));
+        } else {
+          console.log(chalk.gray('No proxy hosts found.'));
+        }
+      }
 
     } catch (error) {
       logger.error('Failed to list configurations:', error.message);
@@ -305,11 +408,21 @@ program
       
       // Get all DNS records
       const dnsRecords = await cloudflare.listDnsRecords();
-      const cnameRecords = dnsRecords.filter(record => record.type === 'CNAME');
+      const cnameRecords = dnsRecords.filter(record => 
+        record.type === 'CNAME' && !record.name.includes('_domainkey')
+      );
       
       if (cnameRecords.length === 0) {
         logger.info('No CNAME records found to check.');
         return;
+      }
+
+      const excludedCount = dnsRecords.filter(record => 
+        record.type === 'CNAME' && record.name.includes('_domainkey')
+      ).length;
+      
+      if (excludedCount > 0) {
+        logger.info(`Excluded ${excludedCount} DKIM records (_domainkey) from cleanup`);
       }
 
       logger.info(`Found ${cnameRecords.length} CNAME records to check`);
@@ -343,7 +456,6 @@ program
 
       // Show stale records
       console.log('\nStale Records:');
-      const { table } = require('table');
       const tableData = [
         ['Domain', 'Target', 'Error', 'Status']
       ];
@@ -424,8 +536,9 @@ program
 
 program
   .command('list-certs')
-  .description('List all SSL certificates in Nginx Proxy Manager')
-  .action(async () => {
+  .description('List all SSL certificates in Nginx Proxy Manager in table format')
+  .option('-j, --json', 'Output in JSON format')
+  .action(async (options) => {
     try {
       const configManager = new ConfigManager();
       const config = await configManager.getConfig();
@@ -445,32 +558,55 @@ program
         return;
       }
 
-      logger.header('SSL Certificates');
-      const { table } = require('table');
-      const tableData = [
-        ['ID', 'Name', 'Domain Names', 'Status', 'Provider', 'Expires', 'Created']
-      ];
-      
-      certificates.forEach(cert => {
-        const domains = cert.domain_names ? cert.domain_names.join(', ') : 'N/A';
-        const status = cert.expires_on ? 'Active' : 'Inactive';
-        const provider = cert.provider || 'Unknown';
-        const expires = cert.expires_on ? new Date(cert.expires_on).toLocaleDateString() : 'N/A';
-        const created = cert.created_on ? new Date(cert.created_on).toLocaleDateString() : 'N/A';
+      if (options.json) {
+        // Output in JSON format
+        console.log(JSON.stringify(certificates, null, 2));
+      } else {
+        // Output in human-readable table format
+        logger.header('SSL Certificates');
+        const tableData = [
+          [chalk.bold('ID'), chalk.bold('Name'), chalk.bold('Domain Names'), chalk.bold('Status'), chalk.bold('Provider'), chalk.bold('Expires'), chalk.bold('Created')]
+        ];
         
-        tableData.push([
-          cert.id.toString(),
-          cert.nice_name || 'Unnamed',
-          domains,
-          status,
-          provider,
-          expires,
-          created
-        ]);
-      });
-      
-      console.log(table(tableData));
-      logger.info(`Found ${certificates.length} SSL certificates`);
+        certificates.forEach(cert => {
+          const domains = cert.domain_names ? cert.domain_names.join(', ') : 'N/A';
+          const status = cert.expires_on ? chalk.green('Active') : chalk.red('Inactive');
+          const provider = cert.provider || 'Unknown';
+          const expires = cert.expires_on ? new Date(cert.expires_on).toLocaleDateString() : 'N/A';
+          const created = cert.created_on ? new Date(cert.created_on).toLocaleDateString() : 'N/A';
+          
+          tableData.push([
+            cert.id.toString(),
+            cert.nice_name || 'Unnamed',
+            domains,
+            status,
+            provider,
+            expires,
+            created
+          ]);
+        });
+        
+        console.log(table(tableData, {
+          border: {
+            topBody: `─`,
+            topJoin: `┬`,
+            topLeft: `┌`,
+            topRight: `┐`,
+            bottomBody: `─`,
+            bottomJoin: `┴`,
+            bottomLeft: `└`,
+            bottomRight: `┘`,
+            bodyLeft: `│`,
+            bodyRight: `│`,
+            bodyJoin: `│`,
+            joinBody: `─`,
+            joinLeft: `├`,
+            joinRight: `┤`,
+            joinJoin: `┼`
+          }
+        }));
+        logger.info(`Found ${certificates.length} SSL certificates`);
+      }
 
     } catch (error) {
       logger.error('Failed to list certificates:', error.message);
@@ -478,4 +614,156 @@ program
     }
   });
 
-program.parse();
+// Set default SSL certificate command
+program
+  .command('set-default-ssl')
+  .description('Set a default SSL certificate to use for new proxy hosts')
+  .option('-i, --id <id>', 'SSL certificate ID to set as default')
+  .option('--clear', 'Clear the default SSL certificate')
+  .action(async (options) => {
+    try {
+      const configManager = new ConfigManager();
+      const config = await configManager.getConfig();
+      
+      if (!validateConfig(config)) {
+        logger.error('Invalid configuration. Please run "homelab-proxy init" first.');
+        process.exit(1);
+      }
+
+      const npm = new NginxProxyManager(config.nginxProxyManager);
+
+      // Handle clearing the default SSL certificate
+      if (options.clear) {
+        const updatedConfig = await configManager.updateConfig({
+          nginxProxyManager: {
+            ...config.nginxProxyManager,
+            defaultSslCertId: undefined
+          }
+        });
+        logger.success('Default SSL certificate cleared');
+        return;
+      }
+
+      // Get certificate ID from command line or prompt
+      let certId = options.id;
+      
+      if (!certId) {
+        const certificates = await npm.getCertificates();
+        
+        if (certificates.length === 0) {
+          logger.error('No SSL certificates found in NPM. Please create a certificate first.');
+          process.exit(1);
+        }
+
+        const inquirer = require('inquirer');
+        const answers = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'certId',
+            message: 'Select default SSL certificate:',
+            choices: certificates.map(cert => ({
+              name: `${cert.nice_name || 'Unnamed'} (ID: ${cert.id}) - ${cert.domain_names ? cert.domain_names.join(', ') : 'N/A'}`,
+              value: cert.id
+            }))
+          }
+        ]);
+        
+        certId = answers.certId;
+      }
+
+      // Validate the certificate exists
+      const certificates = await npm.getCertificates();
+      const selectedCert = certificates.find(cert => cert.id === parseInt(certId));
+      
+      if (!selectedCert) {
+        logger.error(`SSL certificate with ID ${certId} not found`);
+        process.exit(1);
+      }
+
+      // Update configuration
+      const updatedConfig = await configManager.updateConfig({
+        nginxProxyManager: {
+          ...config.nginxProxyManager,
+          defaultSslCertId: parseInt(certId)
+        }
+      });
+
+      logger.success(`Default SSL certificate set to: ${selectedCert.nice_name || 'Unnamed'} (ID: ${certId})`);
+      logger.info(`Domain names: ${selectedCert.domain_names ? selectedCert.domain_names.join(', ') : 'N/A'}`);
+
+    } catch (error) {
+      logger.error('Failed to set default SSL certificate:', error.message);
+      process.exit(1);
+    }
+  });
+
+// Interactive menu when no command is provided
+async function showInteractiveMenu() {
+  const inquirer = require('inquirer');
+  
+  logger.header('🏠 Homelab Proxy Helper');
+  logger.info('Welcome! What would you like to do?');
+  
+  const answers = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'action',
+      message: 'Select an action:',
+      choices: [
+        { name: '🚀 Create new subdomain and proxy', value: 'create' },
+        { name: '📋 List all domains and proxies', value: 'list' },
+        { name: '🗑️  Delete subdomain and proxy', value: 'delete' },
+        { name: '🧹 Cleanup stale records', value: 'cleanup' },
+        { name: '🔒 List SSL certificates', value: 'list-certs' },
+        { name: '⚙️  Set default SSL certificate', value: 'set-default-ssl' },
+        { name: '🔧 Show/Edit configuration', value: 'config' },
+        { name: '🔄 Initialize/Reconfigure', value: 'init' },
+        { name: '❌ Exit', value: 'exit' }
+      ]
+    }
+  ]);
+
+  if (answers.action === 'exit') {
+    logger.info('Goodbye! 👋');
+    process.exit(0);
+  }
+
+  // Execute the selected command
+  try {
+    switch (answers.action) {
+      case 'create':
+        await program.parseAsync(['node', 'homelab-proxy', 'create']);
+        break;
+      case 'list':
+        await program.parseAsync(['node', 'homelab-proxy', 'list']);
+        break;
+      case 'delete':
+        await program.parseAsync(['node', 'homelab-proxy', 'delete']);
+        break;
+      case 'cleanup':
+        await program.parseAsync(['node', 'homelab-proxy', 'cleanup']);
+        break;
+      case 'list-certs':
+        await program.parseAsync(['node', 'homelab-proxy', 'list-certs']);
+        break;
+      case 'set-default-ssl':
+        await program.parseAsync(['node', 'homelab-proxy', 'set-default-ssl']);
+        break;
+      case 'config':
+        await program.parseAsync(['node', 'homelab-proxy', 'config']);
+        break;
+      case 'init':
+        await program.parseAsync(['node', 'homelab-proxy', 'init']);
+        break;
+    }
+  } catch (error) {
+    logger.error('Command failed:', error.message);
+  }
+}
+
+// Check if no command was provided
+if (process.argv.length === 2) {
+  showInteractiveMenu();
+} else {
+  program.parse();
+}
