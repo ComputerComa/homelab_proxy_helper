@@ -1,4 +1,4 @@
-# Homelab- 🔧 **Ngi- 🌐 **Cloudflare Integration**: Automatically create CNAME DNS records for your subdomains
+# Homelab- 🔧 **NgixzproxyManager- 🌐 **Cloudflare Integration**: Automatically create CNAME DNS records for your subdomains
 - 🔧 **Nginx Proxy Manager Integration**: Create proxy host configurations automatically
 - 🔐 **SSL Certificate Management**: Automatically request Let's Encrypt certificates or use existing ones
 - 🎯 **Default SSL Certificate**: Set a default SSL certificate for streamlined proxy creation
@@ -11,19 +11,9 @@
 - ⚡ **Fast Setup**: One command to create complete subdomain + proxy setup
 - 🧹 **Automated Cleanup**: Health monitoring and automatic removal of stale records
 - 🔄 **CNAME-Only**: Optimized for homelab setups with CNAME records pointing to apex domainnager Integration**: Create proxy host configurations automatically
-- 🔐 **SSL Certificate Management**: Automatically request Let's Encrypt certificates or use existing ones
-- 🎯 **Default SSL Certificate**: Set a default SSL certificate for streamlined proxy creation
-- 🌐 **Cloudflare Proxy Support**: CNAME records created with proxy enabled by default for better performance and security
-- 🎮 **Interactive Menu**: User-friendly menu system when no command is provided
-- 📦 **Standalone Executables**: Cross-platform binaries that don't require Node.js
-- 📋 **Interactive CLI**: User-friendly prompts for easy configuration
-- 🎯 **Bulk Operations**: List and manage multiple domains and proxy hosts
-- ⚡ **Fast Setup**: One command to create complete subdomain + proxy setup
-- 🧹 **Automated Cleanup**: Health monitoring and automatic removal of stale records
-- 🔄 **CNAME-Only**: Optimized for homelab setups with CNAME records pointing to apex domain
-- ✅ **A Record Validation**: Automatically validates that apex domain has proper A recorder
+- ✅ **A Record Validation**: Automatically validates that apex domain has proper A record
 
-A Node.js command-line tool to automate the creation of subdomains and Nginx Proxy Manager configurations for homelab projects. This tool integrates with Cloudflare's DNS API and Nginx Proxy Manager's API to streamline the process of setting up reverse proxies for your homelab services.
+A Node.js based command-line tool to automate the creation of subdomains and Nginx Proxy Manager configurations for homelab projects. This tool integrates with Cloudflare's DNS API and Nginx Proxy Manager's API to streamline the process of setting up reverse proxies for your homelab services.
 
 The tool creates CNAME records that point to your apex domain, which is ideal for homelab setups where you have one A record for your main domain and CNAME records for all your services. This approach simplifies IP management and provides a consistent setup.
 
