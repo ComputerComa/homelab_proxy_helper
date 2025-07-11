@@ -2,18 +2,19 @@
 
 A Node.js command-line tool to automate the creation of subdomains and Nginx Proxy Manager configurations for homelab projects. This tool integrates with Cloudflare's DNS API and Nginx Proxy Manager's API to streamline the process of setting up reverse proxies for your homelab services.
 
-By default, the tool creates CNAME records that point to your apex domain, which is ideal for homelab setups where you have one A record for your main domain and CNAME records for all your services.
+The tool creates CNAME records that point to your apex domain, which is ideal for homelab setups where you have one A record for your main domain and CNAME records for all your services. This approach simplifies IP management and provides a consistent setup.
 
 ## Features
 
-- 🌐 **Cloudflare Integration**: Automatically create DNS records for your subdomains
+- 🌐 **Cloudflare Integration**: Automatically create CNAME DNS records for your subdomains
 - 🔧 **Nginx Proxy Manager Integration**: Create proxy host configurations automatically
-- 🔐 **SSL Certificate Management**: Automatically request Let's Encrypt certificates
+- 🔐 **SSL Certificate Management**: Automatically request Let's Encrypt certificates or use existing ones
 - 📋 **Interactive CLI**: User-friendly prompts for easy configuration
 - 🎯 **Bulk Operations**: List and manage multiple domains and proxy hosts
 - ⚡ **Fast Setup**: One command to create complete subdomain + proxy setup
 - 🧹 **Automated Cleanup**: Health monitoring and automatic removal of stale records
-- 🔄 **CNAME Support**: Optimized for homelab setups with CNAME records pointing to apex domain
+- 🔄 **CNAME-Only**: Optimized for homelab setups with CNAME records pointing to apex domain
+- ✅ **A Record Validation**: Automatically validates that apex domain has proper A record
 
 ## Prerequisites
 
@@ -154,7 +155,7 @@ The tool stores configuration in `~/.homelab-proxy/config.json`. You can modify 
     "domains": ["example.com"],
     "defaultIp": "192.168.1.100",
     "proxied": false,
-    "ttl": 300
+    "ttl": "auto"
   },
   "nginxProxyManager": {
     "url": "http://localhost:81",
@@ -322,4 +323,13 @@ grafana.example.com → example.com
 nextcloud.example.com → example.com
 homeassistant.example.com → example.com
 ```
+
+### TTL Configuration
+
+The tool supports Cloudflare's automatic TTL setting:
+
+- **`"auto"`** or **`1`**: Uses Cloudflare's automatic TTL (recommended)
+- **Numeric values**: Sets specific TTL in seconds (e.g., `300`, `3600`)
+
+Automatic TTL provides optimal performance by letting Cloudflare manage TTL values dynamically.
 

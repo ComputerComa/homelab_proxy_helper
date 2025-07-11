@@ -38,13 +38,31 @@ You'll be prompted to enter:
 
 - **Domain name**: Your primary domain managed by Cloudflare (e.g., `example.com`)
 - **Cloudflare API Token**: Your Cloudflare API token
-- **Default IP**: The IP address of your homelab server (e.g., `192.168.1.100`)
-- **Cloudflare Proxy**: Whether to enable Cloudflare proxy (usually `false` for homelab)
-- **DNS TTL**: Time to live for DNS records (default: `300`)
+- **DNS TTL**: Time to live for DNS records (default: `auto` - uses Cloudflare's automatic TTL)
 - **NPM URL**: Your Nginx Proxy Manager URL (e.g., `http://192.168.1.100:81`)
 - **NPM Email**: Your Nginx Proxy Manager email
 - **NPM Password**: Your Nginx Proxy Manager password
 - **Let's Encrypt Email**: Email for SSL certificates (optional)
+
+**Important**: This tool creates CNAME records that point to your apex domain. You must have an A record for your apex domain (e.g., `example.com`) pointing to your server's IP address. The tool will validate this A record exists before creating CNAME records.
+
+### TTL (Time To Live) Options
+
+The tool supports flexible TTL configuration:
+
+- **`auto`** (recommended): Uses Cloudflare's automatic TTL management
+- **Numeric value**: Sets a specific TTL in seconds (e.g., `300`, `3600`)
+
+**Examples:**
+```bash
+# Using auto TTL (recommended)
+"ttl": "auto"
+
+# Using specific TTL
+"ttl": 300
+```
+
+Cloudflare's automatic TTL provides optimal performance by dynamically adjusting TTL values based on various factors.
 
 ## Step 3: Create Your First Subdomain
 
@@ -67,25 +85,65 @@ This will:
 
 **Note**: By default, the tool creates CNAME records that point to your apex domain. This is ideal for homelab setups where you have one A record for your main domain and CNAME records for subdomains.
 
-## DNS Record Types
+## SSL Certificate Options
 
-The tool supports two types of DNS records:
+The tool provides flexible SSL certificate management:
 
-### CNAME Records (Default)
-- Points subdomain to your apex domain (e.g., `grafana.example.com` → `example.com`)
-- Ideal for homelab setups with one main A record
-- Cannot be proxied through Cloudflare
-- Automatically inherits the IP address of your apex domain
-
-### A Records
-- Points subdomain directly to an IP address (e.g., `grafana.example.com` → `192.168.1.100`)
-- Useful when you need different IP addresses for different services
-- Can be proxied through Cloudflare
-
-To create an A record instead of CNAME:
+### Create New SSL Certificate
 ```bash
-homelab-proxy create -s grafana -t 192.168.1.100:3000 --record-type A --dns-target 192.168.1.100
+# Request a new SSL certificate
+homelab-proxy create -s grafana -t 192.168.1.100:3000 --ssl
 ```
+
+### Use Existing SSL Certificate
+```bash
+# Use an existing SSL certificate by ID
+homelab-proxy create -s grafana -t 192.168.1.100:3000 --ssl-cert 5
+```
+
+### List Available SSL Certificates
+```bash
+# View all SSL certificates in NPM
+homelab-proxy list-certs
+```
+
+This will show you all available SSL certificates with their IDs, domains, and expiration dates.
+
+### Interactive SSL Selection
+When using the interactive mode, you'll be prompted to choose between:
+- Creating a new SSL certificate
+- Using an existing SSL certificate (with a list of available certificates)
+
+**Benefits of using existing SSL certificates:**
+- Faster proxy creation (no need to wait for certificate generation)
+- Useful for wildcard certificates that cover multiple subdomains
+- Avoids Let's Encrypt rate limits
+- Consistent SSL configuration across multiple services
+
+## DNS Record Management
+
+This tool works exclusively with **CNAME records** for optimal homelab management:
+
+### How It Works
+- **Apex Domain**: You must have an A record for your main domain (e.g., `example.com` → `192.168.1.100`)
+- **Subdomains**: All subdomains are created as CNAME records pointing to your apex domain
+- **Validation**: The tool automatically validates that an A record exists for your apex domain before creating CNAME records
+
+### Benefits of CNAME-Only Approach
+- **Simplified Management**: Only one IP address to manage (at the apex domain)
+- **Easy IP Changes**: Change your IP once at the apex domain, all subdomains follow automatically
+- **Reduced Configuration**: No need to specify IP addresses for each subdomain
+- **Consistent Setup**: All subdomains inherit the same IP resolution path
+
+### Example Structure
+```
+example.com          (A record)    → 192.168.1.100
+grafana.example.com  (CNAME)       → example.com
+nextcloud.example.com (CNAME)      → example.com
+plex.example.com     (CNAME)       → example.com
+```
+
+**Note**: If you need to change your server's IP address, you only need to update the A record for your apex domain, and all CNAME records will automatically resolve to the new IP.
 
 ## Step 4: Verify Setup
 
@@ -162,13 +220,13 @@ node examples/scheduled-cleanup.js
 
 ### Web Services
 ```bash
-# Nextcloud
+# Nextcloud with new SSL certificate
 homelab-proxy create -s nextcloud -t 192.168.1.101:80 --ssl --force-ssl
 
-# Home Assistant
-homelab-proxy create -s homeassistant -t 192.168.1.102:8123 --ssl
+# Home Assistant with existing SSL certificate
+homelab-proxy create -s homeassistant -t 192.168.1.102:8123 --ssl-cert 3
 
-# Plex
+# Plex with new SSL certificate
 homelab-proxy create -s plex -t 192.168.1.103:32400 --ssl
 ```
 

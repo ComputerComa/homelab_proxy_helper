@@ -37,28 +37,15 @@ class ConfigManager {
       },
       {
         type: 'input',
-        name: 'cloudflareDefaultIp',
-        message: 'Enter your default IP address for A records (your homelab server IP):',
-        default: '192.168.1.100',
-        validate: (input) => {
-          const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-          return ipRegex.test(input) || 'Please enter a valid IP address';
-        }
-      },
-      {
-        type: 'confirm',
-        name: 'cloudflareProxied',
-        message: 'Enable Cloudflare proxy for A records? (Note: CNAME records cannot be proxied)',
-        default: false
-      },
-      {
-        type: 'input',
         name: 'cloudflareTtl',
-        message: 'DNS TTL (seconds):',
-        default: '300',
+        message: 'DNS TTL (seconds or "auto" for Cloudflare default):',
+        default: 'auto',
         validate: (input) => {
+          if (input.toLowerCase() === 'auto') {
+            return true;
+          }
           const num = parseInt(input);
-          return (!isNaN(num) && num > 0) || 'Please enter a valid TTL value';
+          return (!isNaN(num) && num > 0) || 'Please enter a valid TTL value or "auto"';
         }
       },
       {
@@ -104,9 +91,7 @@ class ConfigManager {
       cloudflare: {
         apiToken: answers.cloudflareApiToken,
         domains: [answers.cloudflareDomain],
-        defaultIp: answers.cloudflareDefaultIp,
-        proxied: answers.cloudflareProxied,
-        ttl: parseInt(answers.cloudflareTtl)
+        ttl: answers.cloudflareTtl.toLowerCase() === 'auto' ? 1 : parseInt(answers.cloudflareTtl)
       },
       nginxProxyManager: {
         url: answers.nginxProxyManagerUrl,

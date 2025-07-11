@@ -12,6 +12,40 @@ class CloudflareManager {
     };
   }
 
+  getTtlValue(ttl) {
+    // In Cloudflare API, TTL of 1 means "auto"
+    // Any other value is the actual TTL in seconds
+    if (ttl === 1 || ttl === 'auto') {
+      return 1; // Auto TTL
+    }
+    return parseInt(ttl) || 300; // Default to 300 seconds if invalid
+  }
+
+  // Validate that an A record exists for the apex domain
+  async validateApexARecord(domain) {
+    try {
+      const zoneId = await this.getZoneId(domain);
+      const response = await axios.get(`${this.baseURL}/zones/${zoneId}/dns_records`, {
+        headers: this.headers,
+        params: { 
+          name: domain, // Apex domain
+          type: 'A'
+        }
+      });
+
+      if (response.data.result.length === 0) {
+        throw new Error(`No A record found for apex domain ${domain}. Please create an A record for your domain first.`);
+      }
+
+      const aRecord = response.data.result[0];
+      this.logger.info(`Found A record for ${domain}: ${aRecord.content}`);
+      return aRecord;
+    } catch (error) {
+      this.logger.error('Failed to validate apex A record:', error.message);
+      throw error;
+    }
+  }
+
   async getZoneId(domain) {
     try {
       const response = await axios.get(`${this.baseURL}/zones`, {
@@ -32,24 +66,21 @@ class CloudflareManager {
 
   async createDnsRecord(subdomain, domain, recordType = 'CNAME', content = null) {
     try {
+      // Validate that an A record exists for the apex domain
+      await this.validateApexARecord(domain);
+
       const zoneId = await this.getZoneId(domain);
       const recordName = `${subdomain}.${domain}`;
       
-      // For CNAME records, point to the apex domain (@)
-      // For A records, use the configured IP address
-      let recordContent;
-      if (recordType === 'CNAME') {
-        recordContent = content || domain; // Point to apex domain
-      } else {
-        recordContent = content || this.config.defaultIp; // Use IP for A records
-      }
+      // Only create CNAME records that point to the apex domain
+      const recordContent = content || domain; // Always point to apex domain
 
       const response = await axios.post(`${this.baseURL}/zones/${zoneId}/dns_records`, {
-        type: recordType,
+        type: 'CNAME',
         name: recordName,
         content: recordContent,
-        ttl: this.config.ttl || 300,
-        proxied: recordType === 'CNAME' ? false : (this.config.proxied || false) // CNAME records cannot be proxied
+        ttl: this.getTtlValue(this.config.ttl), // TTL of 1 means "auto" in Cloudflare API
+        proxied: false // CNAME records cannot be proxied
       }, {
         headers: this.headers
       });
@@ -68,10 +99,6 @@ class CloudflareManager {
       this.logger.error('Failed to create DNS record:', error.message);
       throw error;
     }
-  }
-
-  async createARecord(subdomain, domain, ipAddress) {
-    return await this.createDnsRecord(subdomain, domain, 'A', ipAddress);
   }
 
   async createCnameRecord(subdomain, domain, target = null) {

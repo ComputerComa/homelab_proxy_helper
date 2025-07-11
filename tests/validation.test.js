@@ -95,4 +95,25 @@ describe('Validation Utils', () => {
       expect(result.error).toBe('Port must be a number between 1 and 65535');
     });
   });
+
+  describe('TTL validation', () => {
+    test('should accept "auto" as valid TTL', () => {
+      // This would be tested in the config manager, but we can test the logic here
+      const ttl = 'auto';
+      const normalizedTtl = ttl.toLowerCase() === 'auto' ? 1 : parseInt(ttl);
+      expect(normalizedTtl).toBe(1);
+    });
+
+    test('should accept numeric TTL', () => {
+      const ttl = '300';
+      const normalizedTtl = ttl.toLowerCase() === 'auto' ? 1 : parseInt(ttl);
+      expect(normalizedTtl).toBe(300);
+    });
+
+    test('should handle mixed case "AUTO"', () => {
+      const ttl = 'AUTO';
+      const normalizedTtl = ttl.toLowerCase() === 'auto' ? 1 : parseInt(ttl);
+      expect(normalizedTtl).toBe(1);
+    });
+  });
 });

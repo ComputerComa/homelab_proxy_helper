@@ -54,8 +54,8 @@ program
   .option('-d, --domain <domain>', 'Domain name')
   .option('--ssl', 'Enable SSL certificate')
   .option('--force-ssl', 'Force SSL redirect')
-  .option('--record-type <type>', 'DNS record type (CNAME or A)', 'CNAME')
-  .option('--dns-target <target>', 'DNS record target (for A records, specify IP; for CNAME, defaults to apex domain)')
+  .option('--ssl-cert <id>', 'Use existing SSL certificate by ID')
+  .option('--list-certs', 'List available SSL certificates')
   .action(async (options) => {
     try {
       const configManager = new ConfigManager();
@@ -68,6 +68,39 @@ program
 
       const cloudflare = new CloudflareManager(config.cloudflare);
       const npm = new NginxProxyManager(config.nginxProxyManager);
+
+      // Handle certificate listing
+      if (options.listCerts) {
+        logger.info('Fetching available SSL certificates...');
+        const certificates = await npm.getCertificates();
+        
+        if (certificates.length === 0) {
+          logger.info('No SSL certificates found in NPM');
+          return;
+        }
+
+        logger.header('Available SSL Certificates');
+        const { table } = require('table');
+        const tableData = [
+          ['ID', 'Name', 'Domain Names', 'Status', 'Expires']
+        ];
+        
+        certificates.forEach(cert => {
+          const domains = cert.domain_names ? cert.domain_names.join(', ') : 'N/A';
+          const status = cert.expires_on ? 'Active' : 'Inactive';
+          const expires = cert.expires_on ? new Date(cert.expires_on).toLocaleDateString() : 'N/A';
+          tableData.push([
+            cert.id.toString(),
+            cert.nice_name || 'Unnamed',
+            domains,
+            status,
+            expires
+          ]);
+        });
+        
+        console.log(table(tableData));
+        return;
+      }
 
       // Interactive prompts if options not provided
       if (!options.subdomain || !options.target) {
@@ -115,7 +148,31 @@ program
             name: 'ssl',
             message: 'Enable SSL certificate?',
             default: true,
-            when: options.ssl === undefined
+            when: options.ssl === undefined && !options.sslCert
+          },
+          {
+            type: 'list',
+            name: 'sslType',
+            message: 'SSL certificate type:',
+            choices: [
+              { name: 'Request new Let\'s Encrypt certificate', value: 'new' },
+              { name: 'Use existing certificate', value: 'existing' }
+            ],
+            default: 'new',
+            when: (answers) => (answers.ssl || options.ssl) && !options.sslCert
+          },
+          {
+            type: 'list',
+            name: 'sslCert',
+            message: 'Select existing SSL certificate:',
+            choices: async () => {
+              const certificates = await npm.getCertificates();
+              return certificates.map(cert => ({
+                name: `${cert.nice_name || 'Unnamed'} (ID: ${cert.id}) - ${cert.domain_names ? cert.domain_names.join(', ') : 'N/A'}`,
+                value: cert.id
+              }));
+            },
+            when: (answers) => answers.sslType === 'existing' && !options.sslCert
           },
           {
             type: 'confirm',
@@ -131,26 +188,21 @@ program
 
       logger.info(`Creating subdomain: ${options.subdomain}.${options.domain || config.defaultDomain}`);
       
-      // Create DNS record
-      const recordType = options.recordType || 'CNAME';
-      const dnsTarget = options.dnsTarget || (recordType === 'A' ? config.cloudflare.defaultIp : null);
-      
-      if (recordType === 'CNAME') {
-        await cloudflare.createCnameRecord(options.subdomain, options.domain || config.defaultDomain, dnsTarget);
-        logger.success(`CNAME record created: ${options.subdomain}.${options.domain || config.defaultDomain} -> ${dnsTarget || (options.domain || config.defaultDomain)}`);
-      } else {
-        await cloudflare.createARecord(options.subdomain, options.domain || config.defaultDomain, dnsTarget);
-        logger.success(`A record created: ${options.subdomain}.${options.domain || config.defaultDomain} -> ${dnsTarget}`);
-      }
+      // Create CNAME record (validates A record exists for apex domain)
+      await cloudflare.createCnameRecord(options.subdomain, options.domain || config.defaultDomain);
+      logger.success(`CNAME record created: ${options.subdomain}.${options.domain || config.defaultDomain} -> ${options.domain || config.defaultDomain}`);
 
       // Create proxy host
-      await npm.createProxyHost({
+      const proxyHostOptions = {
         subdomain: options.subdomain,
         domain: options.domain || config.defaultDomain,
         target: options.target,
-        ssl: options.ssl,
-        forceSsl: options.forceSsl
-      });
+        ssl: options.ssl || options.sslCert,
+        forceSsl: options.forceSsl,
+        sslCertId: options.sslCert
+      };
+      
+      await npm.createProxyHost(proxyHostOptions);
       logger.success('Proxy host created successfully!');
 
     } catch (error) {
@@ -366,6 +418,62 @@ program
 
     } catch (error) {
       logger.error('Cleanup failed:', error.message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('list-certs')
+  .description('List all SSL certificates in Nginx Proxy Manager')
+  .action(async () => {
+    try {
+      const configManager = new ConfigManager();
+      const config = await configManager.getConfig();
+      
+      if (!validateConfig(config)) {
+        logger.error('Invalid configuration. Please run "homelab-proxy init" first.');
+        process.exit(1);
+      }
+
+      const npm = new NginxProxyManager(config.nginxProxyManager);
+
+      logger.info('Fetching SSL certificates...');
+      const certificates = await npm.getCertificates();
+      
+      if (certificates.length === 0) {
+        logger.info('No SSL certificates found in NPM');
+        return;
+      }
+
+      logger.header('SSL Certificates');
+      const { table } = require('table');
+      const tableData = [
+        ['ID', 'Name', 'Domain Names', 'Status', 'Provider', 'Expires', 'Created']
+      ];
+      
+      certificates.forEach(cert => {
+        const domains = cert.domain_names ? cert.domain_names.join(', ') : 'N/A';
+        const status = cert.expires_on ? 'Active' : 'Inactive';
+        const provider = cert.provider || 'Unknown';
+        const expires = cert.expires_on ? new Date(cert.expires_on).toLocaleDateString() : 'N/A';
+        const created = cert.created_on ? new Date(cert.created_on).toLocaleDateString() : 'N/A';
+        
+        tableData.push([
+          cert.id.toString(),
+          cert.nice_name || 'Unnamed',
+          domains,
+          status,
+          provider,
+          expires,
+          created
+        ]);
+      });
+      
+      console.log(table(tableData));
+      logger.info(`Found ${certificates.length} SSL certificates`);
+
+    } catch (error) {
+      logger.error('Failed to list certificates:', error.message);
       process.exit(1);
     }
   });

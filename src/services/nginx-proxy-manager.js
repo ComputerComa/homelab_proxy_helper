@@ -45,7 +45,7 @@ class NginxProxyManager {
         forward_host: options.target.split(':')[0],
         forward_port: parseInt(options.target.split(':')[1]) || 80,
         access_list_id: 0,
-        certificate_id: 0,
+        certificate_id: options.sslCertId || 0,
         ssl_forced: options.forceSsl || false,
         caching_enabled: false,
         block_exploits: true,
@@ -64,9 +64,11 @@ class NginxProxyManager {
       if (response.data) {
         this.logger.success(`Proxy host created: ${options.subdomain}.${options.domain} -> ${options.target}`);
         
-        // If SSL is enabled, try to get a certificate
-        if (options.ssl) {
+        // If SSL is enabled and no existing certificate ID was provided, try to get a new certificate
+        if (options.ssl && !options.sslCertId) {
           await this.requestSSLCertificate(response.data.id, options.subdomain, options.domain);
+        } else if (options.sslCertId) {
+          this.logger.success(`Using existing SSL certificate ID: ${options.sslCertId}`);
         }
         
         return response.data;
