@@ -62,11 +62,12 @@ function validateSubdomain(subdomain) {
   }
 
   const subdomainRegex = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/i;
-  
+
   if (!subdomainRegex.test(subdomain)) {
-    return { 
-      valid: false, 
-      error: 'Subdomain must contain only letters, numbers, and hyphens, and cannot start or end with a hyphen' 
+    return {
+      valid: false,
+      error:
+        'Subdomain must contain only letters, numbers, and hyphens, and cannot start or end with a hyphen',
     };
   }
 
@@ -74,8 +75,9 @@ function validateSubdomain(subdomain) {
 }
 
 function validateDomain(domain) {
-  const domainRegex = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
-  
+  const domainRegex =
+    /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+
   if (!domain) {
     return { valid: false, error: 'Domain is required' };
   }
@@ -98,11 +100,13 @@ function validateTarget(target) {
   }
 
   const [host, port] = parts;
-  
+
   // Validate host (IP or hostname)
-  const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-  const hostnameRegex = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
-  
+  const ipRegex =
+    /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+  const hostnameRegex =
+    /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+
   if (!ipRegex.test(host) && !hostnameRegex.test(host)) {
     return { valid: false, error: 'Invalid host format' };
   }
@@ -118,7 +122,7 @@ function validateTarget(target) {
 
 function validateEmail(email) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  
+
   if (!email) {
     return { valid: false, error: 'Email is required' };
   }
@@ -144,8 +148,9 @@ function validateUrl(url) {
 }
 
 function validateIpAddress(ip) {
-  const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-  
+  const ipRegex =
+    /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+
   if (!ip) {
     return { valid: false, error: 'IP address is required' };
   }
@@ -164,5 +169,5 @@ module.exports = {
   validateTarget,
   validateEmail,
   validateUrl,
-  validateIpAddress
+  validateIpAddress,
 };

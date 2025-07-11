@@ -7,8 +7,8 @@ class CloudflareManager {
     this.logger = new Logger();
     this.baseURL = 'https://api.cloudflare.com/client/v4';
     this.headers = {
-      'Authorization': `Bearer ${config.apiToken}`,
-      'Content-Type': 'application/json'
+      Authorization: `Bearer ${config.apiToken}`,
+      'Content-Type': 'application/json',
     };
   }
 
@@ -27,14 +27,16 @@ class CloudflareManager {
       const zoneId = await this.getZoneId(domain);
       const response = await axios.get(`${this.baseURL}/zones/${zoneId}/dns_records`, {
         headers: this.headers,
-        params: { 
+        params: {
           name: domain, // Apex domain
-          type: 'A'
-        }
+          type: 'A',
+        },
       });
 
       if (response.data.result.length === 0) {
-        throw new Error(`No A record found for apex domain ${domain}. Please create an A record for your domain first.`);
+        throw new Error(
+          `No A record found for apex domain ${domain}. Please create an A record for your domain first.`
+        );
       }
 
       const aRecord = response.data.result[0];
@@ -50,7 +52,7 @@ class CloudflareManager {
     try {
       const response = await axios.get(`${this.baseURL}/zones`, {
         headers: this.headers,
-        params: { name: domain }
+        params: { name: domain },
       });
 
       if (response.data.result.length === 0) {
@@ -71,22 +73,28 @@ class CloudflareManager {
 
       const zoneId = await this.getZoneId(domain);
       const recordName = `${subdomain}.${domain}`;
-      
+
       // Only create CNAME records that point to the apex domain
       const recordContent = content || domain; // Always point to apex domain
 
-      const response = await axios.post(`${this.baseURL}/zones/${zoneId}/dns_records`, {
-        type: 'CNAME',
-        name: recordName,
-        content: recordContent,
-        ttl: this.getTtlValue(this.config.ttl), // TTL of 1 means "auto" in Cloudflare API
-        proxied: false // CNAME records cannot be proxied
-      }, {
-        headers: this.headers
-      });
+      const response = await axios.post(
+        `${this.baseURL}/zones/${zoneId}/dns_records`,
+        {
+          type: 'CNAME',
+          name: recordName,
+          content: recordContent,
+          ttl: this.getTtlValue(this.config.ttl), // TTL of 1 means "auto" in Cloudflare API
+          proxied: false, // CNAME records cannot be proxied
+        },
+        {
+          headers: this.headers,
+        }
+      );
 
       if (response.data.success) {
-        this.logger.success(`DNS record created: ${recordName} (${recordType}) -> ${recordContent}`);
+        this.logger.success(
+          `DNS record created: ${recordName} (${recordType}) -> ${recordContent}`
+        );
         return response.data.result;
       } else {
         throw new Error(`Cloudflare API error: ${response.data.errors[0].message}`);
@@ -112,7 +120,7 @@ class CloudflareManager {
 
       const response = await axios.get(`${this.baseURL}/zones/${zoneId}/dns_records`, {
         headers: this.headers,
-        params: { name: recordName }
+        params: { name: recordName },
       });
 
       if (response.data.result.length === 0) {
@@ -135,17 +143,19 @@ class CloudflareManager {
         const zoneId = await this.getZoneId(dom);
         const response = await axios.get(`${this.baseURL}/zones/${zoneId}/dns_records`, {
           headers: this.headers,
-          params: { per_page: 100 }
+          params: { per_page: 100 },
         });
 
-        allRecords.push(...response.data.result.map(record => ({
-          domain: dom,
-          name: record.name,
-          type: record.type,
-          content: record.content,
-          proxied: record.proxied,
-          id: record.id
-        })));
+        allRecords.push(
+          ...response.data.result.map(record => ({
+            domain: dom,
+            name: record.name,
+            type: record.type,
+            content: record.content,
+            proxied: record.proxied,
+            id: record.id,
+          }))
+        );
       }
 
       return allRecords;
@@ -160,9 +170,12 @@ class CloudflareManager {
       const record = await this.getDnsRecord(subdomain, domain);
       const zoneId = await this.getZoneId(domain);
 
-      const response = await axios.delete(`${this.baseURL}/zones/${zoneId}/dns_records/${record.id}`, {
-        headers: this.headers
-      });
+      const response = await axios.delete(
+        `${this.baseURL}/zones/${zoneId}/dns_records/${record.id}`,
+        {
+          headers: this.headers,
+        }
+      );
 
       if (response.data.success) {
         this.logger.success(`DNS record deleted: ${subdomain}.${domain}`);
@@ -181,9 +194,13 @@ class CloudflareManager {
       const record = await this.getDnsRecord(subdomain, domain);
       const zoneId = await this.getZoneId(domain);
 
-      const response = await axios.patch(`${this.baseURL}/zones/${zoneId}/dns_records/${record.id}`, updates, {
-        headers: this.headers
-      });
+      const response = await axios.patch(
+        `${this.baseURL}/zones/${zoneId}/dns_records/${record.id}`,
+        updates,
+        {
+          headers: this.headers,
+        }
+      );
 
       if (response.data.success) {
         this.logger.success(`DNS record updated: ${subdomain}.${domain}`);

@@ -27,62 +27,62 @@ class ConfigManager {
         type: 'input',
         name: 'cloudflareDomain',
         message: 'Enter your primary domain name (managed by Cloudflare):',
-        validate: (input) => input.length > 0 || 'Domain name is required'
+        validate: input => input.length > 0 || 'Domain name is required',
       },
       {
         type: 'input',
         name: 'cloudflareApiToken',
         message: 'Enter your Cloudflare API token:',
-        validate: (input) => input.length > 0 || 'API token is required'
+        validate: input => input.length > 0 || 'API token is required',
       },
       {
         type: 'input',
         name: 'cloudflareTtl',
         message: 'DNS TTL (seconds or "auto" for Cloudflare default):',
         default: 'auto',
-        validate: (input) => {
+        validate: input => {
           if (input.toLowerCase() === 'auto') {
             return true;
           }
           const num = parseInt(input);
           return (!isNaN(num) && num > 0) || 'Please enter a valid TTL value or "auto"';
-        }
+        },
       },
       {
         type: 'input',
         name: 'nginxProxyManagerUrl',
         message: 'Enter your Nginx Proxy Manager URL:',
         default: 'http://localhost:81',
-        validate: (input) => {
+        validate: input => {
           try {
             new URL(input);
             return true;
           } catch {
             return 'Please enter a valid URL';
           }
-        }
+        },
       },
       {
         type: 'input',
         name: 'nginxProxyManagerEmail',
         message: 'Enter your Nginx Proxy Manager email:',
-        validate: (input) => {
+        validate: input => {
           const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
           return emailRegex.test(input) || 'Please enter a valid email address';
-        }
+        },
       },
       {
         type: 'password',
         name: 'nginxProxyManagerPassword',
         message: 'Enter your Nginx Proxy Manager password:',
-        validate: (input) => input.length > 0 || 'Password is required'
+        validate: input => input.length > 0 || 'Password is required',
       },
       {
         type: 'input',
         name: 'letsencryptEmail',
         message: 'Enter your Let\'s Encrypt email (optional):',
-        default: (answers) => answers.nginxProxyManagerEmail
-      }
+        default: answers => answers.nginxProxyManagerEmail,
+      },
     ]);
 
     const config = {
@@ -91,15 +91,15 @@ class ConfigManager {
       cloudflare: {
         apiToken: answers.cloudflareApiToken,
         domains: [answers.cloudflareDomain],
-        ttl: answers.cloudflareTtl.toLowerCase() === 'auto' ? 1 : parseInt(answers.cloudflareTtl)
+        ttl: answers.cloudflareTtl.toLowerCase() === 'auto' ? 1 : parseInt(answers.cloudflareTtl),
       },
       nginxProxyManager: {
         url: answers.nginxProxyManagerUrl,
         email: answers.nginxProxyManagerEmail,
         password: answers.nginxProxyManagerPassword,
-        letsencryptEmail: answers.letsencryptEmail
+        letsencryptEmail: answers.letsencryptEmail,
       },
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
 
     await this.saveConfig(config);

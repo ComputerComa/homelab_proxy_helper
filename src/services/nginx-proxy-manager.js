@@ -13,7 +13,7 @@ class NginxProxyManager {
     try {
       const response = await axios.post(`${this.baseURL}/api/tokens`, {
         identity: this.config.email,
-        secret: this.config.password
+        secret: this.config.password,
       });
 
       if (response.data.token) {
@@ -51,32 +51,37 @@ class NginxProxyManager {
         block_exploits: true,
         advanced_config: '',
         locations: [],
-        meta: {}
+        meta: {},
       };
 
       const response = await axios.post(`${this.baseURL}/api/nginx/proxy-hosts`, proxyHostData, {
         headers: {
-          'Authorization': `Bearer ${this.token}`,
-          'Content-Type': 'application/json'
-        }
+          Authorization: `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+        },
       });
 
       if (response.data) {
-        this.logger.success(`Proxy host created: ${options.subdomain}.${options.domain} -> ${options.target}`);
-        
+        this.logger.success(
+          `Proxy host created: ${options.subdomain}.${options.domain} -> ${options.target}`
+        );
+
         // If SSL is enabled and no existing certificate ID was provided, try to get a new certificate
         if (options.ssl && !options.sslCertId) {
           await this.requestSSLCertificate(response.data.id, options.subdomain, options.domain);
         } else if (options.sslCertId) {
           this.logger.success(`Using existing SSL certificate ID: ${options.sslCertId}`);
         }
-        
+
         return response.data;
       } else {
         throw new Error('Failed to create proxy host');
       }
     } catch (error) {
-      if (error.response?.status === 400 && error.response?.data?.message?.includes('already exists')) {
+      if (
+        error.response?.status === 400 &&
+        error.response?.data?.message?.includes('already exists')
+      ) {
         this.logger.warn(`Proxy host ${options.subdomain}.${options.domain} already exists`);
         return await this.getProxyHostByDomain(`${options.subdomain}.${options.domain}`);
       }
@@ -96,27 +101,30 @@ class NginxProxyManager {
         meta: {
           letsencrypt_email: this.config.letsencryptEmail || this.config.email,
           letsencrypt_agree: true,
-          dns_challenge: false
-        }
+          dns_challenge: false,
+        },
       };
 
       const response = await axios.post(`${this.baseURL}/api/nginx/certificates`, certificateData, {
         headers: {
-          'Authorization': `Bearer ${this.token}`,
-          'Content-Type': 'application/json'
-        }
+          Authorization: `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+        },
       });
 
       if (response.data) {
         this.logger.success(`SSL certificate requested for ${subdomain}.${domain}`);
-        
+
         // Update proxy host with certificate
         await this.updateProxyHost(proxyHostId, { certificate_id: response.data.id });
-        
+
         return response.data;
       }
     } catch (error) {
-      this.logger.warn(`Failed to request SSL certificate for ${subdomain}.${domain}:`, error.message);
+      this.logger.warn(
+        `Failed to request SSL certificate for ${subdomain}.${domain}:`,
+        error.message
+      );
       // Don't throw error here as proxy host creation should succeed even if SSL fails
     }
   }
@@ -125,12 +133,16 @@ class NginxProxyManager {
     try {
       await this.ensureAuthenticated();
 
-      const response = await axios.put(`${this.baseURL}/api/nginx/proxy-hosts/${proxyHostId}`, updates, {
-        headers: {
-          'Authorization': `Bearer ${this.token}`,
-          'Content-Type': 'application/json'
+      const response = await axios.put(
+        `${this.baseURL}/api/nginx/proxy-hosts/${proxyHostId}`,
+        updates,
+        {
+          headers: {
+            Authorization: `Bearer ${this.token}`,
+            'Content-Type': 'application/json',
+          },
         }
-      });
+      );
 
       return response.data;
     } catch (error) {
@@ -145,12 +157,12 @@ class NginxProxyManager {
 
       const response = await axios.get(`${this.baseURL}/api/nginx/proxy-hosts`, {
         headers: {
-          'Authorization': `Bearer ${this.token}`
-        }
+          Authorization: `Bearer ${this.token}`,
+        },
       });
 
-      const proxyHost = response.data.find(host => 
-        host.domain_names && host.domain_names.includes(domain)
+      const proxyHost = response.data.find(
+        host => host.domain_names && host.domain_names.includes(domain)
       );
 
       if (!proxyHost) {
@@ -170,8 +182,8 @@ class NginxProxyManager {
 
       const response = await axios.get(`${this.baseURL}/api/nginx/proxy-hosts`, {
         headers: {
-          'Authorization': `Bearer ${this.token}`
-        }
+          Authorization: `Bearer ${this.token}`,
+        },
       });
 
       return response.data.map(host => ({
@@ -181,7 +193,7 @@ class NginxProxyManager {
         ssl: host.certificate_id > 0,
         enabled: host.enabled,
         created: host.created_on,
-        modified: host.modified_on
+        modified: host.modified_on,
       }));
     } catch (error) {
       this.logger.error('Failed to list proxy hosts:', error.message);
@@ -194,10 +206,10 @@ class NginxProxyManager {
       const fullDomain = `${subdomain}.${domain}`;
       const proxyHost = await this.getProxyHostByDomain(fullDomain);
 
-      const response = await axios.delete(`${this.baseURL}/api/nginx/proxy-hosts/${proxyHost.id}`, {
+      await axios.delete(`${this.baseURL}/api/nginx/proxy-hosts/${proxyHost.id}`, {
         headers: {
-          'Authorization': `Bearer ${this.token}`
-        }
+          Authorization: `Bearer ${this.token}`,
+        },
       });
 
       this.logger.success(`Proxy host deleted: ${fullDomain}`);
@@ -214,8 +226,8 @@ class NginxProxyManager {
 
       const response = await axios.get(`${this.baseURL}/api/nginx/certificates`, {
         headers: {
-          'Authorization': `Bearer ${this.token}`
-        }
+          Authorization: `Bearer ${this.token}`,
+        },
       });
 
       return response.data;
