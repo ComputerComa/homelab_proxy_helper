@@ -197,7 +197,7 @@ class NginxProxyManager {
         this.logger.info(`Found ${hosts.length} proxy host(s)`);
       }
       
-      return hosts.map(host => ({
+      const mappedHosts = hosts.map(host => ({
         id: host.id,
         domain_names: host.domain_names,
         forward_host: host.forward_host,
@@ -209,6 +209,9 @@ class NginxProxyManager {
         created_on: host.created_on,
         modified_on: host.modified_on,
       }));
+
+      // Sort by ID in ascending order
+      return mappedHosts.sort((a, b) => (a.id || 0) - (b.id || 0));
     } catch (error) {
       this.logger.error('Failed to list proxy hosts:', error.message);
       throw error;
@@ -244,7 +247,11 @@ class NginxProxyManager {
         },
       });
 
-      return response.data;
+      // Handle different response structures and sort by ID
+      const certificates = response.data.data || response.data || [];
+      
+      // Sort by ID in ascending order
+      return certificates.sort((a, b) => (a.id || 0) - (b.id || 0));
     } catch (error) {
       this.logger.error('Failed to get certificates:', error.message);
       throw error;
