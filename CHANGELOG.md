@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **GitHub Releases**: Fixed GitHub Actions workflow to properly mark releases as stable (not prereleases)
+
 ## [1.5.0] - 2025-07-14
 
 ### Added

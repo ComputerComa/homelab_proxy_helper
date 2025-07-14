@@ -225,7 +225,7 @@ jobs:
           name: Homelab Proxy Helper v${{ needs.check-version.outputs.new-version }}
           body_path: release-notes.md
           draft: false
-          prerelease: ${{ needs.check-version.outputs.is-major-version == 'false' }}
+          prerelease: false
           files: |
             release-assets/homelab-proxy-win.exe
             release-assets/homelab-proxy-linux
@@ -233,8 +233,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Update npm package (if major version)
-        if: needs.check-version.outputs.is-major-version == 'true'
+      - name: Update npm package info
         run: |
-          echo "Major version release detected. Consider updating npm package."
-          echo "Run 'npm publish' manually if you want to publish to npm registry."
+          echo "Release v${{ needs.check-version.outputs.new-version }} created successfully."
+          echo "If you want to publish to npm registry, run 'npm publish' manually."
