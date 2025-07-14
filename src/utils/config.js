@@ -89,10 +89,30 @@ class ConfigManager {
         message: 'Enable WebSocket support by default for new proxy hosts?',
         default: true,
       },
+      {
+        type: 'confirm',
+        name: 'useBasicAuth',
+        message: 'Use basic authentication for cleanup health checks?',
+        default: false,
+      },
+      {
+        type: 'input',
+        name: 'basicAuthUsername',
+        message: 'Enter basic auth username for health checks:',
+        when: answers => answers.useBasicAuth,
+        validate: input => input.length > 0 || 'Username is required when using basic auth',
+      },
+      {
+        type: 'password',
+        name: 'basicAuthPassword',
+        message: 'Enter basic auth password for health checks:',
+        when: answers => answers.useBasicAuth,
+        validate: input => input.length > 0 || 'Password is required when using basic auth',
+      },
     ]);
 
     const config = {
-      version: '1.0.0',
+      version: '1.5.0',
       defaultDomain: answers.cloudflareDomain,
       cloudflare: {
         apiToken: answers.cloudflareApiToken,
@@ -105,6 +125,13 @@ class ConfigManager {
         password: answers.nginxProxyManagerPassword,
         letsencryptEmail: answers.letsencryptEmail,
         defaultWebsockets: answers.defaultWebsockets,
+      },
+      cleanup: {
+        useBasicAuth: answers.useBasicAuth || false,
+        basicAuth: answers.useBasicAuth ? {
+          username: answers.basicAuthUsername,
+          password: answers.basicAuthPassword,
+        } : null,
       },
       createdAt: new Date().toISOString(),
     };

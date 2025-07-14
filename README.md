@@ -118,6 +118,12 @@ homelab-proxy cleanup --dry-run
 
 # Clean up stale records
 homelab-proxy cleanup
+
+# Clean up with basic authentication
+homelab-proxy cleanup --basic-auth-username admin --basic-auth-password secret
+
+# Clean up with custom timeout
+homelab-proxy cleanup --timeout 10000
 ```
 
 ### SSL Certificates
@@ -147,6 +153,16 @@ homelab-proxy set-default-ssl
 ### Config File Location
 - Windows: `%USERPROFILE%\.homelab-proxy\config.json`
 - Linux/macOS: `~/.homelab-proxy/config.json`
+
+### Basic Auth for Cleanup
+If your services require basic authentication, you can configure it for health checks:
+
+During `homelab-proxy init`, you'll be asked if you want to use basic auth for cleanup checks.
+
+Or use command-line options:
+```bash
+homelab-proxy cleanup --basic-auth-username admin --basic-auth-password secret
+```
 
 ### Environment Variables
 ```bash
@@ -185,6 +201,7 @@ The cleanup command checks if services are still reachable:
 - Marks unreachable services as stale
 - Lets you remove them interactively
 - Excludes email records (DKIM) automatically
+- Supports basic authentication for protected services
 
 ## Troubleshooting
 

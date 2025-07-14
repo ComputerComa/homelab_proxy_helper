@@ -3,7 +3,7 @@ const { Logger } = require('./logger');
 
 const logger = new Logger();
 
-async function checkRecordHealth(hostname, timeout = 5000) {
+async function checkRecordHealth(hostname, timeout = 5000, basicAuth = null, promptForAuth = null) {
   const health = {
     hostname,
     isHealthy: false,
@@ -11,6 +11,7 @@ async function checkRecordHealth(hostname, timeout = 5000) {
     error: null,
     responseTime: null,
     timestamp: new Date().toISOString(),
+    authAttempted: false,
   };
 
   try {
@@ -20,17 +21,28 @@ async function checkRecordHealth(hostname, timeout = 5000) {
     const urls = [`https://${hostname}`, `http://${hostname}`];
 
     let lastError = null;
+    let authPrompted = false;
 
     for (const url of urls) {
+      const requestConfig = {
+        timeout: timeout,
+        validateStatus: status => status < 500, // Accept all non-5xx status codes
+        maxRedirects: 5,
+        headers: {
+          'User-Agent': 'Homelab-Proxy-Helper/1.0.0',
+        },
+      };
+
+      // Add basic auth if provided
+      if (basicAuth && basicAuth.username && basicAuth.password) {
+        requestConfig.auth = {
+          username: basicAuth.username,
+          password: basicAuth.password,
+        };
+      }
+
       try {
-        const response = await axios.get(url, {
-          timeout: timeout,
-          validateStatus: status => status < 500, // Accept all non-5xx status codes
-          maxRedirects: 5,
-          headers: {
-            'User-Agent': 'Homelab-Proxy-Helper/1.0.0',
-          },
-        });
+        const response = await axios.get(url, requestConfig);
 
         health.isHealthy = true;
         health.statusCode = response.status;
@@ -40,6 +52,53 @@ async function checkRecordHealth(hostname, timeout = 5000) {
         return health;
       } catch (error) {
         lastError = error;
+
+        // If we get a 401 and haven't tried auth yet, attempt basic auth
+        if (error.response && error.response.status === 401 && !authPrompted) {
+          authPrompted = true;
+          health.authAttempted = true;
+
+          // If we already had basic auth, it means it failed
+          if (basicAuth && basicAuth.username && basicAuth.password) {
+            health.error = 'Authentication failed (saved credentials invalid)';
+            health.statusCode = 401;
+            health.responseTime = Date.now() - startTime;
+            health.isHealthy = false;
+            return health; // Return immediately with auth failure
+          }
+
+          // If we have a prompt function, use it to get auth
+          if (promptForAuth && typeof promptForAuth === 'function') {
+            try {
+              const authCredentials = await promptForAuth(hostname);
+              if (authCredentials && authCredentials.username && authCredentials.password) {
+                // Retry with the prompted credentials on the same URL
+                const retryConfig = {
+                  ...requestConfig,
+                  auth: {
+                    username: authCredentials.username,
+                    password: authCredentials.password,
+                  },
+                };
+
+                try {
+                  const retryResponse = await axios.get(url, retryConfig);
+                  health.isHealthy = true;
+                  health.statusCode = retryResponse.status;
+                  health.responseTime = Date.now() - startTime;
+                  health.protocol = url.startsWith('https') ? 'https' : 'http';
+                  return health;
+                } catch (retryError) {
+                  lastError = retryError;
+                  // If retry fails, continue to next URL
+                }
+              }
+            } catch (authError) {
+              // If auth retry fails, continue with original error handling
+              lastError = authError;
+            }
+          }
+        }
 
         // If we get a 5xx error, mark as unhealthy
         if (error.response && error.response.status >= 500) {
@@ -64,6 +123,9 @@ async function checkRecordHealth(hostname, timeout = 5000) {
         health.error = 'DNS resolution failed';
       } else if (lastError.code === 'ETIMEDOUT' || lastError.code === 'ECONNABORTED') {
         health.error = 'Connection timeout';
+      } else if (lastError.response && lastError.response.status === 401) {
+        health.error = 'Authentication required';
+        health.statusCode = 401;
       } else if (lastError.response && lastError.response.status >= 500) {
         health.error = `HTTP ${lastError.response.status}`;
         health.statusCode = lastError.response.status;
@@ -81,13 +143,13 @@ async function checkRecordHealth(hostname, timeout = 5000) {
   return health;
 }
 
-async function checkMultipleRecords(hostnames, timeout = 5000, concurrency = 5) {
+async function checkMultipleRecords(hostnames, timeout = 5000, concurrency = 5, basicAuth = null, promptForAuth = null) {
   const results = [];
 
   // Process in batches to avoid overwhelming the network
   for (let i = 0; i < hostnames.length; i += concurrency) {
     const batch = hostnames.slice(i, i + concurrency);
-    const batchPromises = batch.map(hostname => checkRecordHealth(hostname, timeout));
+    const batchPromises = batch.map(hostname => checkRecordHealth(hostname, timeout, basicAuth, promptForAuth));
 
     try {
       const batchResults = await Promise.all(batchPromises);

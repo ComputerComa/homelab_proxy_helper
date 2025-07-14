@@ -463,6 +463,8 @@ program
   .option('--dry-run', 'Show what would be cleaned up without making changes')
   .option('--timeout <ms>', 'HTTP timeout in milliseconds', '5000')
   .option('--auto-remove', 'Automatically remove stale records without prompting')
+  .option('--basic-auth-username <username>', 'Username for basic authentication during health checks')
+  .option('--basic-auth-password <password>', 'Password for basic authentication during health checks')
   .action(async options => {
     try {
       const configManager = new ConfigManager();
@@ -504,16 +506,80 @@ program
       const staleRecords = [];
       const healthyRecords = [];
 
+      // Get basic auth configuration if available
+      let basicAuth = config.cleanup && config.cleanup.useBasicAuth ? config.cleanup.basicAuth : null;
+      
+      // Override with command-line options if provided
+      if (options.basicAuthUsername && options.basicAuthPassword) {
+        basicAuth = {
+          username: options.basicAuthUsername,
+          password: options.basicAuthPassword,
+        };
+      }
+
+      if (basicAuth) {
+        logger.info('Using basic authentication for health checks');
+      }
+
+      // Create a prompt function for authentication when needed
+      const promptForAuth = async (hostname) => {
+        if (options.autoRemove) {
+          // Skip auth prompt in auto-remove mode
+          return null;
+        }
+
+        logger.warn(`Service ${hostname} requires authentication`);
+        
+        const inquirer = require('inquirer');
+        const authAnswers = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'provideAuth',
+            message: `Do you want to provide authentication for ${hostname}?`,
+            default: false,
+          },
+          {
+            type: 'input',
+            name: 'username',
+            message: 'Username:',
+            when: answers => answers.provideAuth,
+            validate: input => input.length > 0 || 'Username is required',
+          },
+          {
+            type: 'password',
+            name: 'password',
+            message: 'Password:',
+            when: answers => answers.provideAuth,
+            validate: input => input.length > 0 || 'Password is required',
+          },
+        ]);
+
+        if (authAnswers.provideAuth) {
+          return {
+            username: authAnswers.username,
+            password: authAnswers.password,
+          };
+        }
+
+        return null;
+      };
+
       for (const record of cnameRecords) {
         logger.info(`Checking health of ${record.name}...`);
-        const health = await checkRecordHealth(record.name, parseInt(options.timeout));
+        const health = await checkRecordHealth(record.name, parseInt(options.timeout), basicAuth, promptForAuth);
 
         if (health.isHealthy) {
           healthyRecords.push({ ...record, health });
-          logger.success(`✓ ${record.name} is healthy (${health.statusCode})`);
+          const authNote = health.authAttempted ? ' (authenticated)' : '';
+          logger.success(`✓ ${record.name} is healthy (${health.statusCode})${authNote}`);
         } else {
           staleRecords.push({ ...record, health });
-          logger.warn(`⚠ ${record.name} is STALE (${health.error})`);
+          const statusInfo = health.statusCode ? ` (${health.statusCode})` : '';
+          if (health.statusCode === 401) {
+            logger.warn(`⚠ ${record.name} requires authentication${statusInfo}: ${health.error}`);
+          } else {
+            logger.warn(`⚠ ${record.name} is STALE${statusInfo}: ${health.error}`);
+          }
         }
       }
 
@@ -522,20 +588,46 @@ program
       logger.success(`Healthy records: ${healthyRecords.length}`);
       logger.warn(`Stale records: ${staleRecords.length}`);
 
+      // Show healthy records table
+      if (healthyRecords.length > 0) {
+        console.log('\nHealthy Records:');
+        const healthyTableData = [['Domain', 'Target', 'Status Code', 'Response Time', 'Protocol']];
+        
+        healthyRecords.forEach(record => {
+          const health = record.health;
+          healthyTableData.push([
+            record.name,
+            record.content,
+            health.statusCode || 'N/A',
+            health.responseTime ? `${health.responseTime}ms` : 'N/A',
+            health.protocol || 'N/A'
+          ]);
+        });
+
+        console.log(table(healthyTableData));
+      }
+
       if (staleRecords.length === 0) {
         logger.info('No stale records found. Nothing to clean up!');
         return;
       }
 
-      // Show stale records
+      // Show stale records table
       console.log('\nStale Records:');
-      const tableData = [['Domain', 'Target', 'Error', 'Status']];
+      const staleTableData = [['Domain', 'Target', 'Status Code', 'Error', 'Response Time']];
 
       staleRecords.forEach(record => {
-        tableData.push([record.name, record.content, record.health.error || 'Timeout', 'STALE']);
+        const health = record.health;
+        staleTableData.push([
+          record.name,
+          record.content,
+          health.statusCode || 'N/A',
+          health.error || 'Timeout',
+          health.responseTime ? `${health.responseTime}ms` : 'N/A'
+        ]);
       });
 
-      console.log(table(tableData));
+      console.log(table(staleTableData));
 
       if (options.dryRun) {
         logger.info('Dry run mode - no changes will be made');

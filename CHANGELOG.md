@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.5.0] - 2025-07-14
+
+### Added
+- **Basic Auth Support**: Added basic authentication support for cleanup health checks
+- **CLI Basic Auth Options**: Added `--basic-auth-username` and `--basic-auth-password` options to cleanup command
+- **Config Basic Auth**: Added basic auth configuration during initialization
+- **Sorted Lists**: Proxy hosts and SSL certificates are now sorted by ID for better organization
+- **Enhanced Health Check Display**: Cleanup command now shows detailed tables with HTTP status codes, response times, and protocols for both healthy and stale records
+
+### Fixed
+- **List Sorting**: Fixed proxy host and SSL certificate lists to display in ID order
+- **Status Code Display**: Added HTTP status codes to cleanup warning messages and detailed tables
+
 ## [1.4.1] - 2025-07-11
 
 ### Fixed
